@@ -1,0 +1,3 @@
+numpy
+scikit-allel
+git+https://github.com/popsim-consortium/stdpopsim.git
