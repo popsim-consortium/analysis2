@@ -1,8 +1,6 @@
 #!/usr/bin/env python3
-from collections.abc import Iterable
 import operator
 import pathlib
-from typing import List, Tuple
 
 import allel
 import numpy as np
@@ -17,9 +15,7 @@ OUTPUT_DIRECTORY = "./intervals/HomSap"
 CHROM_IDS = [chrom.id for chrom in stdpopsim.get_species("HomSap").genome.chromosomes]
 
 
-def merged(
-    intervals: Iterable[Tuple[int, int]], *, closed: bool
-) -> List[Tuple[int, int]]:
+def merged(intervals, *, closed: bool):
     """
     Merge overlapping and adjacent intervals.
 
@@ -30,9 +26,7 @@ def merged(
         so [1, 2) and [3, 4) are not adjacent and will not be merged.
     """
 
-    def iter_merged(
-        intervals: Iterable[Tuple[int, int]], *, closed: bool
-    ) -> Iterable[Tuple[int, int]]:
+    def iter_merged(intervals, *, closed: bool):
         """
         Generate tuples of (start, end) coordinates for merged intervals.
         """
