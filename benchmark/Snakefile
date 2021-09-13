@@ -4,10 +4,13 @@ Snakefile for running DFE benchmark on stdpopsim.
 
 import numpy as np
 import stdpopsim
+import tskit
+
 
 # ###############################################################################
 # GENERAL RULES & GLOBALS
 # ###############################################################################
+
 
 def HuberDFE():
     """
@@ -51,6 +54,7 @@ rule simulation:
             intervals=np.array([[0, int(contig.recombination_map.sequence_length)]]),
             **HuberDFE(),
         )
+        contig.mutation_rate = 2.35e-8
         engine = stdpopsim.get_engine("slim")
         ts = engine.simulate(
             model,
@@ -62,6 +66,68 @@ rule simulation:
         )
         ts.dump(output[0])
 
+
 # ###############################################################################
 # dadi/fitdadi
 # ###############################################################################
+
+
+rule generate_dadi_neu_fs:
+    input: rules.simulation.output
+    output:
+    threads: 1
+    run:
+
+rule generate_dadi_nonneu_fs:
+    input: rules.simulation.output
+    output:
+    threads: 1
+    run:
+
+#rule dadi_infer_dm:
+#    input: rules.generate_dadi_neu_fs.output
+#    output:
+#    threads: 28
+#    run:
+
+#rule dadi_bestfit_dm:
+#    input: rules.dadi_infer_dm.output
+
+#rule dadi_generate_cache:
+#    input: rules.dadi_bestfit_dm.output
+#    output:
+#    threads: 28
+#    run:
+
+#rule dadi_infer_dfe:
+#    input: rules.generate_dadi_nonneu_fs.output
+
+#rule dadi_bestfit_dfe:
+#    input: rules.dadi_infer_dfe.output
+
+#rule plot_dadi_results:
+#    input: rules.dadi_bestfit_dfe.output
+
+
+# ###############################################################################
+# polyDFE
+# ###############################################################################
+
+
+#rule generate_polydfe_fs
+
+#rule run_polydfe
+
+#rule plot_polydfe_results
+
+
+# ###############################################################################
+# DFE-alpha
+# ###############################################################################
+
+
+#rule generate_dfe_alpha_fs
+
+#rule run_dfe_alpha
+
+#rule plot_dfe_alpha_results

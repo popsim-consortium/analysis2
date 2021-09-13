@@ -1,0 +1,45 @@
+Building DAG of jobs...
+Using shell: /usr/bin/bash
+Provided cores: 2
+Rules claiming more threads will be scaled down.
+Job stats:
+job           count    min threads    max threads
+----------  -------  -------------  -------------
+all               1              1              1
+simulation        2              1              1
+total             3              1              1
+
+Select jobs to execute...
+
+[Mon Sep 13 14:00:15 2021]
+rule simulation:
+    output: sim_OutOfAfrica_3G09_HuberDFE_1rep.trees
+    jobid: 2
+    wildcards: rep=1
+    resources: tmpdir=/tmp
+
+[Mon Sep 13 14:00:15 2021]
+rule simulation:
+    output: sim_OutOfAfrica_3G09_HuberDFE_0rep.trees
+    jobid: 1
+    wildcards: rep=0
+    resources: tmpdir=/tmp
+
+[Mon Sep 13 14:10:21 2021]
+Finished job 2.
+1 of 3 steps (33%) done
+[Mon Sep 13 14:10:25 2021]
+Finished job 1.
+2 of 3 steps (67%) done
+Select jobs to execute...
+
+[Mon Sep 13 14:10:25 2021]
+localrule all:
+    input: sim_OutOfAfrica_3G09_HuberDFE_0rep.trees, sim_OutOfAfrica_3G09_HuberDFE_1rep.trees
+    jobid: 0
+    resources: tmpdir=/tmp
+
+[Mon Sep 13 14:10:25 2021]
+Finished job 0.
+3 of 3 steps (100%) done
+Complete log: /xdisk/rgutenk/xinhuang/projects/stdpopsim2/analysis2/benchmark/.snakemake/log/2021-09-13T140011.959524.snakemake.log
