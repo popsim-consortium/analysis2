@@ -1,0 +1,3 @@
+"""
+Snakefile for running DFE benchmark on stdpopsim.
+"""
