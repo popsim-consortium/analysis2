@@ -1,3 +1,67 @@
 """
 Snakefile for running DFE benchmark on stdpopsim.
 """
+
+import numpy as np
+import stdpopsim
+
+# ###############################################################################
+# GENERAL RULES & GLOBALS
+# ###############################################################################
+
+def HuberDFE():
+    """
+    Return neutral and negative MutationType()s representing a human DFE.
+    Huber et al. (2017)
+    """
+    neutral = stdpopsim.ext.MutationType()
+    gamma_shape = 0.19  # shape
+    gamma_mean = -0.014  # expected value
+    h = 0.5  # dominance coefficient
+    negative = stdpopsim.ext.MutationType(
+        dominance_coeff=h,
+        distribution_type="g",  # gamma distribution
+        distribution_args=[gamma_mean, gamma_shape],
+    )
+    # neutral mutations have 0 proportion because they are not simulated by SLiM
+    return {"mutation_types": [neutral, negative], "proportions": [0.0, 0.7]}
+
+nreps = np.arange(2)
+
+sim_results_pattern = "sim_OutOfAfrica_3G09_HuberDFE_{rep}rep.trees"
+
+sim_results = expand(sim_results_pattern, rep=nreps)
+
+rule all:
+    input:
+        sim_results
+
+rule simulation:
+    input:
+    output:
+        sim_results_pattern
+    threads: 1
+    run:
+        species = stdpopsim.get_species("HomSap")
+        model = species.get_demographic_model("OutOfAfrica_3G09")
+        contig = species.get_contig("chr1", length_multiplier=0.001)
+        contig.clear_genomic_mutation_types()
+        samples = model.get_samples(100, 100, 100)  # YRI, CEU, CHB
+        contig.add_genomic_element_type(
+            intervals=np.array([[0, int(contig.recombination_map.sequence_length)]]),
+            **HuberDFE(),
+        )
+        engine = stdpopsim.get_engine("slim")
+        ts = engine.simulate(
+            model,
+            contig,
+            samples,
+            seed=123,
+            slim_scaling_factor=1,
+            slim_burn_in=10,
+        )
+        ts.dump(output[0])
+
+# ###############################################################################
+# dadi/fitdadi
+# ###############################################################################
