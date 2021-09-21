@@ -38,7 +38,7 @@ import dadi
 
 rule all:
     input:
-        "pop0.two_epoch_1d.gamma.InferDFE.bestfits"
+        "pop0.two_epoch_1d.gamma.mut.prop.pdf"
 
 #rule simulation:
 #    input:
@@ -149,6 +149,14 @@ rule dadi_bestfit_dfe:
     threads: 1
     shell:
         "dadi-cli BestFit --input-prefix ./pop0.two_epoch_1d.gamma.InferDFE --pdf gamma --ubounds {dfe_ubounds} --lbounds {dfe_lbounds}"
+
+rule dadi_plot_results:
+    input: rules.dadi_bestfit_dfe.output
+    output:
+        "pop0.two_epoch_1d.gamma.mut.prop.pdf"
+    threads: 1
+    shell:
+        "dadi-cli Plot --dfe-popt {input} --pdf1d gamma --output {output} --mut-rate 2.35e-8 --seq-len 248956 --ratio 2.31"
 
 # ###############################################################################
 # polyDFE
