@@ -5,6 +5,7 @@ Snakefile for running DFE benchmark on stdpopsim.
 import numpy as np
 import stdpopsim
 import tskit
+import dadi
 
 
 # ###############################################################################
@@ -37,76 +38,65 @@ sim_results = expand(sim_results_pattern, rep=nreps)
 
 rule all:
     input:
-        sim_results
+        "p0.neu.fs",
+        "p0.nonneu.fs"
 
-rule simulation:
+#rule simulation:
+#    input:
+#    output:
+#        sim_results_pattern
+#    threads: 1
+#    run:
+#        species = stdpopsim.get_species("HomSap")
+#        model = species.get_demographic_model("OutOfAfrica_3G09")
+#        contig = species.get_contig("chr1", length_multiplier=0.001)
+#        contig.clear_genomic_mutation_types()
+#        samples = model.get_samples(100, 100, 100)  # YRI, CEU, CHB
+#        contig.add_genomic_element_type(
+#            intervals=np.array([[0, int(contig.recombination_map.sequence_length)]]),
+#            **HuberDFE(),
+#        )
+#        contig.mutation_rate = 2.35e-8
+#        engine = stdpopsim.get_engine("slim")
+#        ts = engine.simulate(
+#            model,
+#            contig,
+#            samples,
+#            seed=123,
+#            slim_scaling_factor=1,
+#            slim_burn_in=10,
+#        )
+#        ts.dump(output[0])
+
+rule slim_simulation:
     input:
+        "Hum_OutOfAfrica3G09_HuberDFE.late.slim.txt"
     output:
-        sim_results_pattern
+        "p0.late.slimout",
+        "p1.late.slimout",
+        "p2.late.slimout"
+    threads: 1
+    shell:
+        "slim -d SEQSIZE=248956 {input}"
+
+rule generate_fs:
+    input:
+        rules.slim_simulation.output
+    output:
+        "p0.neu.fs", "p0.nonneu.fs"
     threads: 1
     run:
-        species = stdpopsim.get_species("HomSap")
-        model = species.get_demographic_model("OutOfAfrica_3G09")
-        contig = species.get_contig("chr1", length_multiplier=0.001)
-        contig.clear_genomic_mutation_types()
-        samples = model.get_samples(100, 100, 100)  # YRI, CEU, CHB
-        contig.add_genomic_element_type(
-            intervals=np.array([[0, int(contig.recombination_map.sequence_length)]]),
-            **HuberDFE(),
-        )
-        contig.mutation_rate = 2.35e-8
-        engine = stdpopsim.get_engine("slim")
-        ts = engine.simulate(
-            model,
-            contig,
-            samples,
-            seed=123,
-            slim_scaling_factor=1,
-            slim_burn_in=10,
-        )
-        ts.dump(output[0])
-
+        dd_syn, ns = dadi.Misc.dd_from_SLiM_files(input, mut_types=['m0'])
+        dd_non, ns = dadi.Misc.dd_from_SLiM_files(input, mut_types=['m1'])
+        popids = range(len(ns))
+        fs_syn = dadi.Spectrum.from_data_dict(dd_syn, popids, ns)
+        fs_non = dadi.Spectrum.from_data_dict(dd_non, popids, ns)
+        fs_syn.marginalize([1,2]).to_file(output[0])
+        fs_non.marginalize([1,2]).to_file(output[1])
 
 # ###############################################################################
-# dadi/fitdadi
+# dadi
 # ###############################################################################
-
-
-rule generate_dadi_neu_fs:
-    input: rules.simulation.output
-    output:
-    threads: 1
-    run:
-
-rule generate_dadi_nonneu_fs:
-    input: rules.simulation.output
-    output:
-    threads: 1
-    run:
-
-#rule dadi_infer_dm:
-#    input: rules.generate_dadi_neu_fs.output
-#    output:
-#    threads: 28
-#    run:
-
-#rule dadi_bestfit_dm:
-#    input: rules.dadi_infer_dm.output
-
-#rule dadi_generate_cache:
-#    input: rules.dadi_bestfit_dm.output
-#    output:
-#    threads: 28
-#    run:
-
-#rule dadi_infer_dfe:
-#    input: rules.generate_dadi_nonneu_fs.output
-
-#rule dadi_bestfit_dfe:
-#    input: rules.dadi_infer_dfe.output
-
-#rule plot_dadi_results:
-#    input: rules.dadi_bestfit_dfe.output
 
 
 # ###############################################################################
