@@ -13,33 +13,32 @@ import dadi
 # ###############################################################################
 
 
-def HuberDFE():
-    """
-    Return neutral and negative MutationType()s representing a human DFE.
-    Huber et al. (2017)
-    """
-    neutral = stdpopsim.ext.MutationType()
-    gamma_shape = 0.19  # shape
-    gamma_mean = -0.014  # expected value
-    h = 0.5  # dominance coefficient
-    negative = stdpopsim.ext.MutationType(
-        dominance_coeff=h,
-        distribution_type="g",  # gamma distribution
-        distribution_args=[gamma_mean, gamma_shape],
-    )
+#def HuberDFE():
+#    """
+#    Return neutral and negative MutationType()s representing a human DFE.
+#    Huber et al. (2017)
+#    """
+#    neutral = stdpopsim.ext.MutationType()
+#    gamma_shape = 0.19  # shape
+#    gamma_mean = -0.014  # expected value
+#    h = 0.5  # dominance coefficient
+#    negative = stdpopsim.ext.MutationType(
+#        dominance_coeff=h,
+#        distribution_type="g",  # gamma distribution
+#        distribution_args=[gamma_mean, gamma_shape],
+#    )
     # neutral mutations have 0 proportion because they are not simulated by SLiM
-    return {"mutation_types": [neutral, negative], "proportions": [0.0, 0.7]}
+#    return {"mutation_types": [neutral, negative], "proportions": [0.0, 0.7]}
 
-nreps = np.arange(2)
+#nreps = np.arange(2)
 
-sim_results_pattern = "sim_OutOfAfrica_3G09_HuberDFE_{rep}rep.trees"
+#sim_results_pattern = "sim_OutOfAfrica_3G09_HuberDFE_{rep}rep.trees"
 
-sim_results = expand(sim_results_pattern, rep=nreps)
+#sim_results = expand(sim_results_pattern, rep=nreps)
 
 rule all:
     input:
-        "p0.neu.fs",
-        "p0.nonneu.fs"
+        "pop0.two_epoch_1d.gamma.InferDFE.bestfits"
 
 #rule simulation:
 #    input:
@@ -83,7 +82,7 @@ rule generate_fs:
     input:
         rules.slim_simulation.output
     output:
-        "p0.neu.fs", "p0.nonneu.fs"
+        "pop0.neu.fs", "pop0.nonneu.fs"
     threads: 1
     run:
         dd_syn, ns = dadi.Misc.dd_from_SLiM_files(input, mut_types=['m0'])
@@ -98,6 +97,58 @@ rule generate_fs:
 # dadi
 # ###############################################################################
 
+demo_model = 'two_epoch_1d'
+demo_p0 = '5 5'
+demo_lbounds = '10e-3 10e-3' 
+demo_ubounds = '10 10'
+dfe_model = 'gamma'
+dfe_p0 = '0.5 1000'
+dfe_lbounds = '0 0'
+dfe_ubounds = '1 50000'
+
+rule dadi_infer_dm:
+    input: 
+        "pop0.neu.fs"
+    output:
+        "pop0.two_epoch_1d.InferDM.opts.0"
+    threads: 8
+    shell:
+        "dadi-cli InferDM --fs {input} --model {demo_model} --p0 {demo_p0} --ubounds {demo_ubounds} --lbounds {demo_lbounds} --output-prefix pop0.two_epoch_1d --thread 100"
+
+rule dadi_bestfit_dm:
+    input: rules.dadi_infer_dm.output
+    output:
+        "pop0.two_epoch_1d.InferDM.bestfits"
+    threads: 1
+    shell: 
+        "dadi-cli BestFit --input-prefix ./pop0.two_epoch_1d.InferDM --model {demo_model} --ubounds {demo_ubounds} --lbounds {demo_lbounds}"
+
+rule dadi_generate_cache:
+    input: rules.dadi_bestfit_dm.output
+    output:
+        "pop0.two_epoch.sel.spectra.bpkl"
+    threads: 8
+    shell:
+        "dadi-cli GenerateCache --model two_epoch --demo-popt {input} --sample-size 100 --output {output} --mp --grids 800 1000 1200 --gamma-pts 500"
+
+rule dadi_infer_dfe:
+    input:
+        "pop0.nonneu.fs",
+        "pop0.two_epoch.sel.spectra.bpkl",
+        "pop0.two_epoch_1d.InferDM.bestfits"
+    output:
+        "pop0.two_epoch_1d.gamma.InferDFE.opts.0"
+    threads: 8
+    shell:
+        "dadi-cli InferDFE --fs {input[0]} --cache1d {input[1]} --demo-popt {input[2]} --output-prefix pop0.two_epoch_1d.gamma --pdf1d {dfe_model} --p0 {dfe_p0} --ubounds {dfe_ubounds} --lbounds {dfe_lbounds} --ratio 2.31 --thread 100"
+
+rule dadi_bestfit_dfe:
+    input: rules.dadi_infer_dfe.output
+    output:
+        "pop0.two_epoch_1d.gamma.InferDFE.bestfits"
+    threads: 1
+    shell:
+        "dadi-cli BestFit --input-prefix ./pop0.two_epoch_1d.gamma.InferDFE --pdf gamma --ubounds {dfe_ubounds} --lbounds {dfe_lbounds}"
 
 # ###############################################################################
 # polyDFE
