@@ -7,28 +7,49 @@ import stdpopsim
 import tskit
 import dadi
 
-
 # ###############################################################################
 # GENERAL RULES & GLOBALS
 # ###############################################################################
 
 
-#def HuberDFE():
-#    """
-#    Return neutral and negative MutationType()s representing a human DFE.
-#    Huber et al. (2017)
-#    """
-#    neutral = stdpopsim.ext.MutationType()
-#    gamma_shape = 0.19  # shape
-#    gamma_mean = -0.014  # expected value
-#    h = 0.5  # dominance coefficient
-#    negative = stdpopsim.ext.MutationType(
-#        dominance_coeff=h,
-#        distribution_type="g",  # gamma distribution
-#        distribution_args=[gamma_mean, gamma_shape],
-#    )
+def HuberDFE():
+    """
+    Return neutral and negative MutationType()s representing a human DFE.
+    Huber et al. (2017)
+    """
+    neutral = stdpopsim.ext.MutationType()
+    gamma_shape = 0.19  # shape
+    gamma_mean = -0.014  # expected value
+    h = 0.5  # dominance coefficient
+    negative = stdpopsim.ext.MutationType(
+        dominance_coeff=h,
+        distribution_type="g",  # gamma distribution
+        distribution_args=[gamma_mean, gamma_shape],
+    )
     # neutral mutations have 0 proportion because they are not simulated by SLiM
-#    return {"mutation_types": [neutral, negative], "proportions": [0.0, 0.7]}
+    return {"mutation_types": [neutral, negative], "proportions": [0.0, 0.7]}
+
+def count_mut_derived(ts):
+    import collections
+    num_derived = np.zeros(ts.num_mutations, dtype=int)
+    neu_indicators = []
+    for tree in ts.trees():
+        for site in tree.sites():
+            for m in site.mutations:
+                counts = collections.Counter({site.ancestral_state: ts.num_samples})
+                if m.metadata['mutation_list'][0]['selection_coeff'] == 0: is_neutral = True
+                else: is_neutral = False
+                current_state = site.ancestral_state
+                if m.parent != tskit.NULL:
+                    current_state = ts.mutation(m.parent).derived_state
+                # Silent mutations do nothing
+                if current_state != m.derived_state:
+                    num_samples = tree.num_samples(m.node)
+                    counts[m.derived_state] += num_samples
+                    counts[current_state] -= num_samples
+                num_derived[m.id] = ts.num_samples - counts[site.ancestral_state]
+                neu_indicators.append(is_neutral)
+    return num_derived, neu_indicators
 
 #nreps = np.arange(2)
 
@@ -38,60 +59,34 @@ import dadi
 
 rule all:
     input:
-        "pop0.two_epoch_1d.gamma.mut.prop.pdf"
-
-#rule simulation:
-#    input:
-#    output:
-#        sim_results_pattern
-#    threads: 1
-#    run:
-#        species = stdpopsim.get_species("HomSap")
-#        model = species.get_demographic_model("OutOfAfrica_3G09")
-#        contig = species.get_contig("chr1", length_multiplier=0.001)
-#        contig.clear_genomic_mutation_types()
-#        samples = model.get_samples(100, 100, 100)  # YRI, CEU, CHB
-#        contig.add_genomic_element_type(
-#            intervals=np.array([[0, int(contig.recombination_map.sequence_length)]]),
-#            **HuberDFE(),
-#        )
-#        contig.mutation_rate = 2.35e-8
-#        engine = stdpopsim.get_engine("slim")
-#        ts = engine.simulate(
-#            model,
-#            contig,
-#            samples,
-#            seed=123,
-#            slim_scaling_factor=1,
-#            slim_burn_in=10,
-#        )
-#        ts.dump(output[0])
-
-rule slim_simulation:
-    input:
-        "Hum_OutOfAfrica3G09_HuberDFE.late.slim.txt"
-    output:
-        "p0.late.slimout",
-        "p1.late.slimout",
-        "p2.late.slimout"
-    threads: 1
-    shell:
-        "slim -d SEQSIZE=248956 {input}"
-
-rule generate_fs:
-    input:
-        rules.slim_simulation.output
-    output:
         "pop0.neu.fs", "pop0.nonneu.fs"
+
+rule simulation:
+    input:
+    output:
+        "Hum_OutOfAfrica_3G09_HuberDFE.ts"
     threads: 1
     run:
-        dd_syn, ns = dadi.Misc.dd_from_SLiM_files(input, mut_types=['m0'])
-        dd_non, ns = dadi.Misc.dd_from_SLiM_files(input, mut_types=['m1'])
-        popids = range(len(ns))
-        fs_syn = dadi.Spectrum.from_data_dict(dd_syn, popids, ns)
-        fs_non = dadi.Spectrum.from_data_dict(dd_non, popids, ns)
-        fs_syn.marginalize([1,2]).to_file(output[0])
-        fs_non.marginalize([1,2]).to_file(output[1])
+        species = stdpopsim.get_species("HomSap")
+        model = species.get_demographic_model("OutOfAfrica_3G09")
+        contig = species.get_contig("chr1", length_multiplier=0.001)
+        contig.clear_genomic_mutation_types()
+        samples = model.get_samples(100, 100, 100)  # YRI, CEU, CHB
+        contig.add_genomic_element_type(
+            intervals=np.array([[0, int(contig.recombination_map.sequence_length)]]),
+            **HuberDFE(),
+        )
+        contig.mutation_rate = 2.35e-8
+        engine = stdpopsim.get_engine("slim")
+        ts = engine.simulate(
+            model,
+            contig,
+            samples,
+            seed=123,
+            slim_scaling_factor=1,
+            slim_burn_in=10,
+        )
+        ts.dump(output[0])
 
 # ###############################################################################
 # dadi
@@ -106,57 +101,70 @@ dfe_p0 = '0.5 1000'
 dfe_lbounds = '0 0'
 dfe_ubounds = '1 50000'
 
-rule dadi_infer_dm:
-    input: 
-        "pop0.neu.fs"
+rule generate_dadi_fs:
+    input: rules.simulation.output
     output:
-        "pop0.two_epoch_1d.InferDM.opts.0"
-    threads: 8
-    shell:
-        "dadi-cli InferDM --fs {input} --model {demo_model} --p0 {demo_p0} --ubounds {demo_ubounds} --lbounds {demo_lbounds} --output-prefix pop0.two_epoch_1d --thread 100"
-
-rule dadi_bestfit_dm:
-    input: rules.dadi_infer_dm.output
-    output:
-        "pop0.two_epoch_1d.InferDM.bestfits"
+        "pop0.neu.fs", "pop0.nonneu.fs"
     threads: 1
-    shell: 
-        "dadi-cli BestFit --input-prefix ./pop0.two_epoch_1d.InferDM --model {demo_model} --ubounds {demo_ubounds} --lbounds {demo_lbounds}"
+    run:
+       ts = tskit.load(input[0])
+       counts, neus = count_mut_derived(ts.simplify(list(range(100))))
+       neu_fs = np.bincount(counts[neus])
+       non_neu_fs = np.bincount(counts[np.logical_not(neus)])
+       dadi.Spectrum(neu_fs).to_file(output[0])
+       dadi.Spectrum(non_neu_fs).to_file(output[1])
 
-rule dadi_generate_cache:
-    input: rules.dadi_bestfit_dm.output
-    output:
-        "pop0.two_epoch.sel.spectra.bpkl"
-    threads: 8
-    shell:
-        "dadi-cli GenerateCache --model two_epoch --demo-popt {input} --sample-size 100 --output {output} --mp --grids 800 1000 1200 --gamma-pts 500"
+#rule dadi_infer_dm:
+#    input: 
+#        "pop0.neu.fs"
+#    output:
+#        "pop0.two_epoch_1d.InferDM.opts.0"
+#    threads: 8
+#    shell:
+#        "dadi-cli InferDM --fs {input} --model {demo_model} --p0 {demo_p0} --ubounds {demo_ubounds} --lbounds {demo_lbounds} --output-prefix pop0.two_epoch_1d --thread 100"
 
-rule dadi_infer_dfe:
-    input:
-        "pop0.nonneu.fs",
-        "pop0.two_epoch.sel.spectra.bpkl",
-        "pop0.two_epoch_1d.InferDM.bestfits"
-    output:
-        "pop0.two_epoch_1d.gamma.InferDFE.opts.0"
-    threads: 8
-    shell:
-        "dadi-cli InferDFE --fs {input[0]} --cache1d {input[1]} --demo-popt {input[2]} --output-prefix pop0.two_epoch_1d.gamma --pdf1d {dfe_model} --p0 {dfe_p0} --ubounds {dfe_ubounds} --lbounds {dfe_lbounds} --ratio 2.31 --thread 100"
+#rule dadi_bestfit_dm:
+#    input: rules.dadi_infer_dm.output
+#    output:
+#        "pop0.two_epoch_1d.InferDM.bestfits"
+#    threads: 1
+#    shell: 
+#        "dadi-cli BestFit --input-prefix ./pop0.two_epoch_1d.InferDM --model {demo_model} --ubounds {demo_ubounds} --lbounds {demo_lbounds}"
 
-rule dadi_bestfit_dfe:
-    input: rules.dadi_infer_dfe.output
-    output:
-        "pop0.two_epoch_1d.gamma.InferDFE.bestfits"
-    threads: 1
-    shell:
-        "dadi-cli BestFit --input-prefix ./pop0.two_epoch_1d.gamma.InferDFE --pdf gamma --ubounds {dfe_ubounds} --lbounds {dfe_lbounds}"
+#rule dadi_generate_cache:
+#    input: rules.dadi_bestfit_dm.output
+#    output:
+#        "pop0.two_epoch.sel.spectra.bpkl"
+#    threads: 8
+#    shell:
+#        "dadi-cli GenerateCache --model two_epoch --demo-popt {input} --sample-size 100 --output {output} --mp --grids 800 1000 1200 --gamma-pts 500"
 
-rule dadi_plot_results:
-    input: rules.dadi_bestfit_dfe.output
-    output:
-        "pop0.two_epoch_1d.gamma.mut.prop.pdf"
-    threads: 1
-    shell:
-        "dadi-cli Plot --dfe-popt {input} --pdf1d gamma --output {output} --mut-rate 2.35e-8 --seq-len 248956 --ratio 2.31"
+#rule dadi_infer_dfe:
+#    input:
+#        "pop0.nonneu.fs",
+#        "pop0.two_epoch.sel.spectra.bpkl",
+#        "pop0.two_epoch_1d.InferDM.bestfits"
+#    output:
+#        "pop0.two_epoch_1d.gamma.InferDFE.opts.0"
+#    threads: 8
+#    shell:
+#        "dadi-cli InferDFE --fs {input[0]} --cache1d {input[1]} --demo-popt {input[2]} --output-prefix pop0.two_epoch_1d.gamma --pdf1d {dfe_model} --p0 {dfe_p0} --ubounds {dfe_ubounds} --lbounds {dfe_lbounds} --ratio 2.31 --thread 100"
+
+#rule dadi_bestfit_dfe:
+#    input: rules.dadi_infer_dfe.output
+#    output:
+#        "pop0.two_epoch_1d.gamma.InferDFE.bestfits"
+#    threads: 1
+#    shell:
+#        "dadi-cli BestFit --input-prefix ./pop0.two_epoch_1d.gamma.InferDFE --pdf gamma --ubounds {dfe_ubounds} --lbounds {dfe_lbounds}"
+
+#rule dadi_plot_results:
+#    input: rules.dadi_bestfit_dfe.output
+#    output:
+#        "pop0.two_epoch_1d.gamma.mut.prop.pdf"
+#    threads: 1
+#    shell:
+#        "dadi-cli Plot --dfe-popt {input} --pdf1d gamma --output {output} --mut-rate 2.35e-8 --seq-len 248956 --ratio 2.31"
 
 # ###############################################################################
 # polyDFE
