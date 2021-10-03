@@ -39,7 +39,7 @@ import dadi
 rule all:
     input:
 #        "results/dadi/pop0.two_epoch_1d.gamma.mut.prop.pdf"
-         "results/polydfe/pop0.polydfe.fs"
+        "results/polyDFE/pop0.polyDFE.results"
 
 #rule simulation:
 #    input:
@@ -170,9 +170,11 @@ rule generate_polydfe_fs:
         "results/dadi/pop0.neu.fs",
         "results/dadi/pop0.nonneu.fs"
     output:
-        "results/polydfe/pop0.polydfe.fs"
+        "results/polyDFE/pop0.polyDFE.fs"
     threads: 1
     run:
+        # Project down to 20 chromosomes
+        # See https://github.com/paula-tataru/polyDFE/issues/3
         neu_fs = dadi.Spectrum.from_file(input[0]).project([20])
         nonneu_fs = dadi.Spectrum.from_file(input[1]).project([20])
         neu_len = round(248956 * 0.3)
@@ -183,7 +185,13 @@ rule generate_polydfe_fs:
             o.write(" ".join([str(round(f)) for f in nonneu_fs[1:-1]]) + " " + str(nonneu_len) + "\n")
 
 
-#rule run_polydfe
+rule run_polydfe:
+    input: rules.generate_polydfe_fs.output
+    output: 
+        "results/polyDFE/pop0.polyDFE.results"
+    threads: 1
+    shell:
+        "./polyDFE-2.0-linux-64-bit -d results/polyDFE/pop0.polyDFE.fs -m C -i polyDFE_init_models.txt 1 -e > {output[0]}"
 
 #rule plot_polydfe_results
 
