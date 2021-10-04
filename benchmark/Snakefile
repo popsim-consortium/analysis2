@@ -39,7 +39,8 @@ import dadi
 rule all:
     input:
 #        "results/dadi/pop0.two_epoch_1d.gamma.mut.prop.pdf"
-        "results/polyDFE/pop0.polyDFE.results"
+#        "results/polyDFE/pop0.polyDFE.results"
+         "results/dfe-alpha/nonneu/est_dfe.out"
 
 #rule simulation:
 #    input:
@@ -201,8 +202,29 @@ rule run_polydfe:
 # ###############################################################################
 
 
-#rule generate_dfe_alpha_fs
+rule generate_dfe_alpha_fs:
+    input:
+        "results/dadi/pop0.neu.fs",
+        "results/dadi/pop0.nonneu.fs"
+    output:
+        "results/dfe-alpha/pop0.dfe-alpha.fs"
+    threads: 1
+    run:
+        neu_fs = dadi.Spectrum.from_file(input[0])
+        nonneu_fs = dadi.Spectrum.from_file(input[1])
+        with open(output[0], 'w') as o:
+            o.write("1\n")
+            o.write(str(len(neu_fs)-1)+"\n")
+            o.write(" ".join([str(round(f)) for f in nonneu_fs.data]) + "\n")
+            o.write(" ".join([str(round(f)) for f in neu_fs.data]) + "\n")
 
-#rule run_dfe_alpha
+rule run_dfe_alpha:
+    input:
+        "dfe-alpha.neu.config",
+        "dfe-alpha.nonneu.config"
+    output: "results/dfe-alpha/nonneu/est_dfe.out"
+    threads: 1
+    shell:
+        "est_dfe -c {input[0]}; est_dfe -c {input[1]}"
 
 #rule plot_dfe_alpha_results
