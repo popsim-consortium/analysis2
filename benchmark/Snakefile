@@ -12,25 +12,33 @@ import dadi
 # GENERAL RULES & GLOBALS
 # ###############################################################################
 
-
-#def HuberDFE():
-#    """
-#    Return neutral and negative MutationType()s representing a human DFE.
-#    Huber et al. (2017)
-#    """
-#    neutral = stdpopsim.ext.MutationType()
-#    gamma_shape = 0.19  # shape
-#    gamma_mean = -0.014  # expected value
-#    h = 0.5  # dominance coefficient
-#    negative = stdpopsim.ext.MutationType(
-#        dominance_coeff=h,
-#        distribution_type="g",  # gamma distribution
-#        distribution_args=[gamma_mean, gamma_shape],
-#    )
+def HuberDFE():
+    """
+    Return neutral and negative MutationType()s representing a human DFE.
+    Huber et al. (2017)
+    """
+    neutral = stdpopsim.ext.MutationType()
+    gamma_shape = 0.19  # shape
+    gamma_mean = -0.014  # expected value
+    h = 0.5  # dominance coefficient
+    negative = stdpopsim.ext.MutationType(
+        dominance_coeff=h,
+        distribution_type="g",  # gamma distribution
+        distribution_args=[gamma_mean, gamma_shape],
+    )
     # neutral mutations have 0 proportion because they are not simulated by SLiM
-#    return {"mutation_types": [neutral, negative], "proportions": [0.0, 0.7]}
+    return {"mutation_types": [neutral, negative], "proportions": [0.0, 0.7]}
 
-#nreps = np.arange(2)
+def allele_counts(ts, sample_sets=None):
+    if sample_sets is None:
+        sample_sets = [ts.samples()]
+    def f(x):
+        return x
+    return ts.sample_count_stat(sample_sets, f, len(sample_sets),
+              span_normalise=False, windows='sites',
+              polarised=True, mode='site', strict=False)
+
+#nreps = np.arange(1)
 
 #sim_results_pattern = "sim_OutOfAfrica_3G09_HuberDFE_{rep}rep.trees"
 
@@ -38,69 +46,97 @@ import dadi
 
 rule all:
     input:
-#        "results/dadi/pop0.two_epoch_1d.gamma.mut.prop.pdf"
-#        "results/polyDFE/pop0.polyDFE.results"
-         "results/dfe-alpha/nonneu/est_dfe.out"
+#        "results/dadi/pop0.neu.fs", "results/dadi/pop0.nonneu.fs"
+#        sim_results
+        "results/dadi/pop0.two_epoch_1d.gamma.mut.prop.pdf",
+        "results/polyDFE/pop0.polyDFE.results",
+        "results/dfe-alpha/nonneu/est_dfe.out"
+#        "results/dadi/pop0.neu.fs", 
+#        "results/dadi/pop0.nonneu.fs",
+#        "results/polyDFE/pop0.polyDFE.fs",
+#        "results/dfe-alpha/pop0.dfe-alpha.fs"
 
-#rule simulation:
-#    input:
-#    output:
-#        sim_results_pattern
-#    threads: 1
-#    run:
-#        species = stdpopsim.get_species("HomSap")
-#        model = species.get_demographic_model("OutOfAfrica_3G09")
-#        contig = species.get_contig("chr1", length_multiplier=0.001)
-#        contig.clear_genomic_mutation_types()
-#        samples = model.get_samples(100, 100, 100)  # YRI, CEU, CHB
-#        contig.add_genomic_element_type(
-#            intervals=np.array([[0, int(contig.recombination_map.sequence_length)]]),
-#            **HuberDFE(),
-#        )
-#        contig.mutation_rate = 2.35e-8
-#        engine = stdpopsim.get_engine("slim")
-#        ts = engine.simulate(
-#            model,
-#            contig,
-#            samples,
-#            seed=123,
-#            slim_scaling_factor=1,
-#            slim_burn_in=10,
-#        )
-#        ts.dump(output[0])
-
-rule slim_simulation:
+rule simulation:
     input:
-        "Hum_OutOfAfrica3G09_HuberDFE.late.slim.txt"
     output:
-        "p0.late.slimout",
-        "p1.late.slimout",
-        "p2.late.slimout"
-    threads: 1
-    shell:
-        "slim -d SEQSIZE=248956 {input}"
-
-rule generate_fs:
-    input:
-        rules.slim_simulation.output
-    output:
-        "results/dadi/pop0.neu.fs", 
-        "results/dadi/pop0.nonneu.fs"
+        "sim_OutOfAfrica_3G09_HuberDFE.trees"
     threads: 1
     run:
-        dd_syn, ns = dadi.Misc.dd_from_SLiM_files(input, mut_types=['m0'])
-        dd_non, ns = dadi.Misc.dd_from_SLiM_files(input, mut_types=['m1'])
-        popids = range(len(ns))
-        fs_syn = dadi.Spectrum.from_data_dict(dd_syn, popids, ns)
-        fs_non = dadi.Spectrum.from_data_dict(dd_non, popids, ns)
-        fs_syn.marginalize([1,2]).to_file(output[0])
-        fs_non.marginalize([1,2]).to_file(output[1])
+        species = stdpopsim.get_species("HomSap")
+        model = species.get_demographic_model("OutOfAfrica_3G09")
+        contig = species.get_contig("chr1", length_multiplier=0.001)
+        contig.clear_genomic_mutation_types()
+        samples = model.get_samples(100, 100, 100)  # YRI, CEU, CHB
+        contig.add_genomic_element_type(
+            intervals=np.array([[0, int(contig.recombination_map.sequence_length)]]),
+            **HuberDFE(),
+        )
+        contig.mutation_rate = 2.35e-8
+        engine = stdpopsim.get_engine("slim")
+        ts = engine.simulate(
+            model,
+            contig,
+            samples,
+            #seed=123,
+            slim_scaling_factor=1,
+            slim_burn_in=10,
+        )
+        ts.dump(output[0])
+
+rule generate_dadi_fs:
+    input:
+        rules.simulation.output
+    output:
+        "results/dadi/pop0.neu.fs", 
+        "results/dadi/pop0.nonneu.fs",
+        "results/polyDFE/pop0.polyDFE.fs",
+        "results/dfe-alpha/pop0.dfe-alpha.fs"
+    threads: 1
+    run:
+        ts = tskit.load(input[0])
+        samps = ts.samples()[0:100]
+        mut_type = np.zeros(ts.num_sites)
+        for j, s in enumerate(ts.sites()):
+            for m in s.mutations:
+                mut_type[j] = m.metadata["mutation_list"][0]["mutation_type"]
+
+        freqs = allele_counts(ts, [samps])
+        freqs = freqs.flatten().astype(int)
+        mut_afs = np.zeros((len(samps)+1, 2), dtype='int64')
+        for k in range(2):
+            mut_afs[:, k] = np.bincount(freqs[mut_type == k+1], minlength=len(samps) + 1)
+
+        # For dadi
+        nonneu_fs = dadi.Spectrum(mut_afs[:,0])
+        neu_fs = dadi.Spectrum(mut_afs[:,1])
+
+        neu_fs.to_file(output[0])
+        nonneu_fs.to_file(output[1])
+
+        # For polyDFE
+        # Project down to 20 chromosomes
+        # See https://github.com/paula-tataru/polyDFE/issues/3
+        neu_fs_proj = neu_fs.project([20])
+        nonneu_fs_proj = nonneu_fs.project([20])
+        neu_len = round(248956 * 0.3)
+        nonneu_len = round(248956 * 0.7)
+        with open(output[2], 'w') as o:
+            o.write("1 1 20\n")
+            o.write(" ".join([str(round(f)) for f in neu_fs_proj[1:-1]]) + " " + str(neu_len) + "\n")
+            o.write(" ".join([str(round(f)) for f in nonneu_fs_proj[1:-1]]) + " " + str(nonneu_len) + "\n")
+
+        # For DFE-alpha
+        with open(output[3], 'w') as o:
+            o.write("1\n")
+            o.write(str(len(neu_fs)-1)+"\n")
+            o.write(" ".join([str(round(f)) for f in nonneu_fs.data]) + "\n")
+            o.write(" ".join([str(round(f)) for f in neu_fs.data]) + "\n")
 
 # ###############################################################################
 # dadi
 # ###############################################################################
 
-demo_model = 'two_epoch_1d'
+demo_model = 'two_epoch'
 demo_p0 = '5 5'
 demo_lbounds = '10e-3 10e-3' 
 demo_ubounds = '10 1'
@@ -165,29 +201,8 @@ rule dadi_plot_results:
 # polyDFE
 # ###############################################################################
 
-
-rule generate_polydfe_fs:
-    input:
-        "results/dadi/pop0.neu.fs",
-        "results/dadi/pop0.nonneu.fs"
-    output:
-        "results/polyDFE/pop0.polyDFE.fs"
-    threads: 1
-    run:
-        # Project down to 20 chromosomes
-        # See https://github.com/paula-tataru/polyDFE/issues/3
-        neu_fs = dadi.Spectrum.from_file(input[0]).project([20])
-        nonneu_fs = dadi.Spectrum.from_file(input[1]).project([20])
-        neu_len = round(248956 * 0.3)
-        nonneu_len = round(248956 * 0.7)
-        with open(output[0], 'w') as o:
-            o.write("1 1 20\n")
-            o.write(" ".join([str(round(f)) for f in neu_fs[1:-1]]) + " " + str(neu_len) + "\n")
-            o.write(" ".join([str(round(f)) for f in nonneu_fs[1:-1]]) + " " + str(nonneu_len) + "\n")
-
-
 rule run_polydfe:
-    input: rules.generate_polydfe_fs.output
+    input: "results/polyDFE/pop0.polyDFE.fs"
     output: 
         "results/polyDFE/pop0.polyDFE.results"
     threads: 1
@@ -201,27 +216,11 @@ rule run_polydfe:
 # DFE-alpha
 # ###############################################################################
 
-
-rule generate_dfe_alpha_fs:
-    input:
-        "results/dadi/pop0.neu.fs",
-        "results/dadi/pop0.nonneu.fs"
-    output:
-        "results/dfe-alpha/pop0.dfe-alpha.fs"
-    threads: 1
-    run:
-        neu_fs = dadi.Spectrum.from_file(input[0])
-        nonneu_fs = dadi.Spectrum.from_file(input[1])
-        with open(output[0], 'w') as o:
-            o.write("1\n")
-            o.write(str(len(neu_fs)-1)+"\n")
-            o.write(" ".join([str(round(f)) for f in nonneu_fs.data]) + "\n")
-            o.write(" ".join([str(round(f)) for f in neu_fs.data]) + "\n")
-
 rule run_dfe_alpha:
     input:
         "dfe-alpha.neu.config",
-        "dfe-alpha.nonneu.config"
+        "dfe-alpha.nonneu.config",
+        "results/dfe-alpha/pop0.dfe-alpha.fs"
     output: "results/dfe-alpha/nonneu/est_dfe.out"
     threads: 1
     shell:
