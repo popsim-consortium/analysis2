@@ -48,9 +48,12 @@ rule all:
     input:
 #        "results/dadi/pop0.neu.fs", "results/dadi/pop0.nonneu.fs"
 #        sim_results
-        "results/dadi/pop0.two_epoch_1d.gamma.mut.prop.pdf",
-        "results/polyDFE/pop0.polyDFE.results",
-        "results/dfe-alpha/nonneu/est_dfe.out"
+        #"results/dadi/pop0.two_epoch_1d.gamma.mut.prop.pdf",
+        #"results/polyDFE/pop0.polyDFE.results",
+        #"results/dfe-alpha/nonneu/est_dfe.out",
+        #"results/anavar/pop0.anavar.ctl.txt",
+        "results/anavar/pop0.anavar.results",
+        "results/anavar/pop0.anavar.log",
 #        "results/dadi/pop0.neu.fs", 
 #        "results/dadi/pop0.nonneu.fs",
 #        "results/polyDFE/pop0.polyDFE.fs",
@@ -90,7 +93,8 @@ rule generate_fs:
         "results/dadi/pop0.neu.fs", 
         "results/dadi/pop0.nonneu.fs",
         "results/polyDFE/pop0.polyDFE.fs",
-        "results/dfe-alpha/pop0.dfe-alpha.fs"
+        "results/dfe-alpha/pop0.dfe-alpha.fs",
+        "results/anavar/pop0.anavar.ctl.txt"
     threads: 1
     run:
         ts = tskit.load(input[0])
@@ -139,6 +143,37 @@ rule generate_fs:
             o.write(" ".join([str(round(f)) for f in neu_fs.data]) + "\n")
 
         # For anavar
+        anavar_alg_cmd = [
+            '[algorithm_commands]',
+            'search_algorithm: NLOPT_LD_SLSQP',
+            'maxeval: 100000',
+            'maxtime: 600',
+            'num_searches: 100',
+            'nnoimp: 2',
+            'maximp: 3',
+            'optional: false'
+        ]
+        anavar_mdl_cmd = [
+            '[model_commands]',
+            'model: SNP_1',
+            'n: ' + str(nonneu_fs.sample_sizes[0]),
+            'm: 248956',
+            'folded: false',
+            'sfs: ' + ", ".join([str(round(f)) for f in nonneu_fs.data[1:-1]]),
+            'dfe: continuous',
+            'distribution: reflected_gamma',
+            'theta_range: 0.1, 1000',
+            'shape_range: 0.1, 100',
+            'scale_range: 0.1, 100',
+            'e_range: 0, 1',
+            'constraint: no_pol_error',
+            'optional: false'
+        ]
+
+        with open(output[4], 'w') as o:
+            o.write("\n".join(anavar_alg_cmd)+"\n\n\n")
+            o.write("\n".join(anavar_mdl_cmd)+"\n")
+
 
 # ###############################################################################
 # dadi
@@ -219,7 +254,6 @@ rule run_polydfe:
 
 #rule plot_polydfe_results
 
-
 # ###############################################################################
 # DFE-alpha
 # ###############################################################################
@@ -235,3 +269,28 @@ rule run_dfe_alpha:
         "est_dfe -c {input[0]}; est_dfe -c {input[1]}"
 
 #rule plot_dfe_alpha_results
+
+# ###############################################################################
+# anavar
+# ###############################################################################
+
+rule run_anavar:
+    input:
+        "results/anavar/pop0.anavar.ctl.txt"
+    output:
+        "results/anavar/pop0.anavar.results",
+        "results/anavar/pop0.anavar.log"
+    threads: 1
+    shell:
+        "anavar {input[0]} {output[0]} {output[1]}"
+
+
+# ###############################################################################
+# prfreq
+# ###############################################################################
+
+#rule run_prfreq:
+#    input:
+#    output:
+#    threads: 1
+#    shell:
