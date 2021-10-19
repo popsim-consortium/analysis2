@@ -83,7 +83,7 @@ rule simulation:
         )
         ts.dump(output[0])
 
-rule generate_dadi_fs:
+rule generate_fs:
     input:
         rules.simulation.output
     output:
@@ -97,13 +97,19 @@ rule generate_dadi_fs:
         samps = ts.samples()[0:100]
         mut_type = np.zeros(ts.num_sites)
         for j, s in enumerate(ts.sites()):
+            mt = []
             for m in s.mutations:
-                mut_type[j] = m.metadata["mutation_list"][0]["mutation_type"]
+                for md in m.metadata["mutation_list"]:
+                    mt.append(md["mutation_type"])
+            if len(set(mt)) > 1:
+                mut_type[j] = 3
+            else:
+                mut_type[j] = mt[0]
 
         freqs = allele_counts(ts, [samps])
         freqs = freqs.flatten().astype(int)
-        mut_afs = np.zeros((len(samps)+1, 2), dtype='int64')
-        for k in range(2):
+        mut_afs = np.zeros((len(samps)+1, 3), dtype='int64')
+        for k in range(3):
             mut_afs[:, k] = np.bincount(freqs[mut_type == k+1], minlength=len(samps) + 1)
 
         # For dadi
@@ -131,6 +137,8 @@ rule generate_dadi_fs:
             o.write(str(len(neu_fs)-1)+"\n")
             o.write(" ".join([str(round(f)) for f in nonneu_fs.data]) + "\n")
             o.write(" ".join([str(round(f)) for f in neu_fs.data]) + "\n")
+
+        # For anavar
 
 # ###############################################################################
 # dadi
