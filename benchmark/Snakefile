@@ -8,7 +8,7 @@ import stdpopsim
 import tskit
 import dadi
 
-configfile: "config/snakemake/config.yml"
+configfile: "config/snakemake/config.yaml"
 
 np.random.seed(config["seed"])
 
@@ -87,6 +87,7 @@ rule simulation:
     output:
         output_dir + "/simulated_data/{seeds}/sim_OutOfAfrica_3G09_HuberDFE_{chrms}.trees"
     threads: 1
+    resources: time_min=60, mem=10000, cpus=1
     run:
         contig = species.get_contig(wildcards.chrms, length_multiplier=0.001)
         contig.clear_genomic_mutation_types()
