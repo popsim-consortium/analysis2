@@ -3,3 +3,4 @@ intervals/
 __pycache__
 benchmark/.snakemake/*
 benchmark/results/*
+benchmark/logs_slurm/*
