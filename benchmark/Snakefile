@@ -87,9 +87,9 @@ rule simulation:
     output:
         output_dir + "/simulated_data/{seeds}/sim_OutOfAfrica_3G09_HuberDFE_{chrms}.trees"
     threads: 1
-    resources: time_min=60, mem=10000, cpus=1
+    resources: time_min=1440, mem_mb=10000, cpus=1
     run:
-        contig = species.get_contig(wildcards.chrms, length_multiplier=0.001)
+        contig = species.get_contig(wildcards.chrms)
         contig.clear_genomic_mutation_types()
         samples = model.get_samples(*num_samples_per_population)  # YRI, CEU, CHB
         contig.add_genomic_element_type(
@@ -102,7 +102,7 @@ rule simulation:
             model,
             contig,
             samples,
-            slim_scaling_factor=10,
+            slim_scaling_factor=1,
             slim_burn_in=10,
             seed=wildcards.seeds,
         )

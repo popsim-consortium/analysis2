@@ -1,7 +1,7 @@
 "seed": 12345
 "population_id": 0
 "num_samples_per_population": [100, 100, 100]
-"replicates": 10
+"replicates": 100
 "species": "HomSap"
 "model": "OutOfAfrica_3G09"
 "genetic_map": "HapmapII_GRCh37"
