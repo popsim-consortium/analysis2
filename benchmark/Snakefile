@@ -7,6 +7,9 @@ import stdpopsim
 import tskit
 import dadi
 
+configfile: "config/snakemake/config.yml"
+
+np.random.seed(config["seed"])
 
 # ###############################################################################
 # GENERAL RULES & GLOBALS
@@ -46,18 +49,13 @@ def allele_counts(ts, sample_sets=None):
 
 rule all:
     input:
-#        "results/dadi/pop0.neu.fs", "results/dadi/pop0.nonneu.fs"
 #        sim_results
-        #"results/dadi/pop0.two_epoch_1d.gamma.mut.prop.pdf",
-        #"results/polyDFE/pop0.polyDFE.results",
-        #"results/dfe-alpha/nonneu/est_dfe.out",
-        #"results/anavar/pop0.anavar.ctl.txt",
+        "results/dadi/pop0.two_epoch_1d.gamma.mut.prop.pdf",
+        "results/polyDFE/pop0.polyDFE.results",
+        "results/dfe-alpha/nonneu/est_dfe.out",
+        "results/anavar/pop0.anavar.ctl.txt",
         "results/anavar/pop0.anavar.results",
-        "results/anavar/pop0.anavar.log",
-#        "results/dadi/pop0.neu.fs", 
-#        "results/dadi/pop0.nonneu.fs",
-#        "results/polyDFE/pop0.polyDFE.fs",
-#        "results/dfe-alpha/pop0.dfe-alpha.fs"
+        #"results/anavar/pop0.anavar.log",
 
 rule simulation:
     input:
@@ -250,7 +248,7 @@ rule run_polydfe:
         "results/polyDFE/pop0.polyDFE.results"
     threads: 1
     shell:
-        "./polyDFE-2.0-linux-64-bit -d results/polyDFE/pop0.polyDFE.fs -m C -i polyDFE_init_models.txt 1 -e > {output[0]}"
+        "./polyDFE-2.0-linux-64-bit -d results/polyDFE/pop0.polyDFE.fs -m C -i config/polyDFE/polyDFE_init_models.txt 1 -e > {output[0]}"
 
 #rule plot_polydfe_results
 
@@ -260,8 +258,8 @@ rule run_polydfe:
 
 rule run_dfe_alpha:
     input:
-        "dfe-alpha.neu.config",
-        "dfe-alpha.nonneu.config",
+        "config/dfe-alpha/dfe-alpha.neu.config",
+        "config/dfe-alpha/dfe-alpha.nonneu.config",
         "results/dfe-alpha/pop0.dfe-alpha.fs"
     output: "results/dfe-alpha/nonneu/est_dfe.out"
     threads: 1
