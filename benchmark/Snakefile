@@ -2,6 +2,7 @@
 Snakefile for running DFE benchmark on stdpopsim.
 """
 
+import os
 import numpy as np
 import stdpopsim
 import tskit
@@ -14,6 +15,32 @@ np.random.seed(config["seed"])
 # ###############################################################################
 # GENERAL RULES & GLOBALS
 # ###############################################################################
+
+
+# The number of replicates of each analysis you would like to run
+replicates = config["replicates"]
+
+# Where you would like all output files from analysis to live
+output_dir = os.path.abspath(config["output_dir"])
+
+# The analysis species
+species = stdpopsim.get_species(config["species"])
+
+# The specific model you would like to run
+model = species.get_demographic_model(config["model"])
+
+# The number of samples to simulate for within each population
+num_samples_per_population = config["num_samples_per_population"]
+
+# The names of all chromosomes to simulate, separated by commas
+# Use "all" to simulate all chromsomes for the genome
+chrm_list = [chrom.id for chrom in species.genome.chromosomes]
+if "chrY" in chrm_list:
+    chrm_list.remove("chrY")
+if(config["chrm_list"] != "all"):
+    chrm_list = [chr for chr in config["chrm_list"].split(",")]
+
+seed_array = np.random.random_integers(1,2**31,replicates)
 
 def HuberDFE():
     """
@@ -41,33 +68,29 @@ def allele_counts(ts, sample_sets=None):
               span_normalise=False, windows='sites',
               polarised=True, mode='site', strict=False)
 
-#nreps = np.arange(1)
-
-#sim_results_pattern = "sim_OutOfAfrica_3G09_HuberDFE_{rep}rep.trees"
-
-#sim_results = expand(sim_results_pattern, rep=nreps)
-
+## Run only the simulations!
 rule all:
-    input:
+    input: expand(output_dir + "/simulated_data/{seeds}/sim_OutOfAfrica_3G09_HuberDFE_{chrms}.trees", seeds=seed_array, chrms=chrm_list) 
+
+#rule all:
+#    input:
 #        sim_results
-        "results/dadi/pop0.two_epoch_1d.gamma.mut.prop.pdf",
-        "results/polyDFE/pop0.polyDFE.results",
-        "results/dfe-alpha/nonneu/est_dfe.out",
-        "results/anavar/pop0.anavar.ctl.txt",
-        "results/anavar/pop0.anavar.results",
+#        "results/dadi/pop0.two_epoch_1d.gamma.mut.prop.pdf",
+#        "results/polyDFE/pop0.polyDFE.results",
+#        "results/dfe-alpha/nonneu/est_dfe.out",
+#        "results/anavar/pop0.anavar.ctl.txt",
+#        "results/anavar/pop0.anavar.results",
         #"results/anavar/pop0.anavar.log",
 
 rule simulation:
     input:
     output:
-        "sim_OutOfAfrica_3G09_HuberDFE.trees"
+        output_dir + "/simulated_data/{seeds}/sim_OutOfAfrica_3G09_HuberDFE_{chrms}.trees"
     threads: 1
     run:
-        species = stdpopsim.get_species("HomSap")
-        model = species.get_demographic_model("OutOfAfrica_3G09")
-        contig = species.get_contig("chr1", length_multiplier=0.001)
+        contig = species.get_contig(wildcards.chrms, length_multiplier=0.001)
         contig.clear_genomic_mutation_types()
-        samples = model.get_samples(100, 100, 100)  # YRI, CEU, CHB
+        samples = model.get_samples(*num_samples_per_population)  # YRI, CEU, CHB
         contig.add_genomic_element_type(
             intervals=np.array([[0, int(contig.recombination_map.sequence_length)]]),
             **HuberDFE(),
@@ -78,9 +101,9 @@ rule simulation:
             model,
             contig,
             samples,
-            #seed=123,
-            slim_scaling_factor=1,
+            slim_scaling_factor=10,
             slim_burn_in=10,
+            seed=wildcards.seeds,
         )
         ts.dump(output[0])
 
