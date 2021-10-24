@@ -203,7 +203,7 @@ rule generate_fs:
 
         # For prfreq
         with open(output[5], 'w') as o:
-            for d in nonneu_fs.data[1:-1]:
+            for d in nonneu_fs.data[1:]:
                 o.write(f"{d}\n")
 
 
