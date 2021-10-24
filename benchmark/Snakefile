@@ -69,8 +69,8 @@ def allele_counts(ts, sample_sets=None):
               polarised=True, mode='site', strict=False)
 
 ## Run only the simulations!
-rule all:
-    input: expand(output_dir + "/simulated_data/{seeds}/sim_OutOfAfrica_3G09_HuberDFE_{chrms}.trees", seeds=seed_array, chrms=chrm_list) 
+#rule all:
+#    input: expand(output_dir + "/simulated_data/{seeds}/sim_OutOfAfrica_3G09_HuberDFE_{chrms}.trees", seeds=seed_array, chrms=chrm_list) 
 
 #rule all:
 #    input:
@@ -81,6 +81,9 @@ rule all:
 #        "results/anavar/pop0.anavar.ctl.txt",
 #        "results/anavar/pop0.anavar.results",
         #"results/anavar/pop0.anavar.log",
+
+rule all:
+    input: "results/prfreq/pop0.prfreq.fs"
 
 rule simulation:
     input:
@@ -110,13 +113,15 @@ rule simulation:
 
 rule generate_fs:
     input:
-        rules.simulation.output
+        #rules.simulation.output
+        "sim_OutOfAfrica_3G09_HuberDFE.trees"
     output:
         "results/dadi/pop0.neu.fs", 
         "results/dadi/pop0.nonneu.fs",
         "results/polyDFE/pop0.polyDFE.fs",
         "results/dfe-alpha/pop0.dfe-alpha.fs",
-        "results/anavar/pop0.anavar.ctl.txt"
+        "results/anavar/pop0.anavar.ctl.txt",
+        "results/prfreq/pop0.prfreq.fs"
     threads: 1
     run:
         ts = tskit.load(input[0])
@@ -195,6 +200,11 @@ rule generate_fs:
         with open(output[4], 'w') as o:
             o.write("\n".join(anavar_alg_cmd)+"\n\n\n")
             o.write("\n".join(anavar_mdl_cmd)+"\n")
+
+        # For prfreq
+        with open(output[5], 'w') as o:
+            for d in nonneu_fs.data[1:-1]:
+                o.write(f"{d}\n")
 
 
 # ###############################################################################
