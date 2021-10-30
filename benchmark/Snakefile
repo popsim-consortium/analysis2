@@ -72,18 +72,22 @@ def allele_counts(ts, sample_sets=None):
 #rule all:
 #    input: expand(output_dir + "/simulated_data/{seeds}/sim_OutOfAfrica_3G09_HuberDFE_{chrms}.trees", seeds=seed_array, chrms=chrm_list) 
 
+## Run only generating the frequency spectra
+rule all:
+    input: 
+        expand(output_dir + "dadi/{seeds}/{chrms}/pop0/pop0.{types}.fs", seeds=seed_array, chrms=chrm_list, types=['neu', 'nonneu'])
+
 #rule all:
 #    input:
-#        sim_results
 #        "results/dadi/pop0.two_epoch_1d.gamma.mut.prop.pdf",
 #        "results/polyDFE/pop0.polyDFE.results",
 #        "results/dfe-alpha/nonneu/est_dfe.out",
 #        "results/anavar/pop0.anavar.ctl.txt",
 #        "results/anavar/pop0.anavar.results",
-        #"results/anavar/pop0.anavar.log",
+#        "results/anavar/pop0.anavar.log",
 
-rule all:
-    input: "results/prfreq/pop0.prfreq.fs"
+#rule all:
+#    input: "results/prfreq/pop0.prfreq.fs"
 
 rule simulation:
     input:
@@ -114,16 +118,19 @@ rule simulation:
 rule generate_fs:
     input:
         #rules.simulation.output
-        "sim_OutOfAfrica_3G09_HuberDFE.trees"
+        "results/simulated_data/986507084/sim_OutOfAfrica_3G09_HuberDFE_chr21.trees"
     output:
         "results/dadi/pop0.neu.fs", 
         "results/dadi/pop0.nonneu.fs",
         "results/polyDFE/pop0.polyDFE.fs",
         "results/dfe-alpha/pop0.dfe-alpha.fs",
-        "results/anavar/pop0.anavar.ctl.txt",
-        "results/prfreq/pop0.prfreq.fs"
+#        "results/anavar/pop0.anavar.ctl.txt",
+#        "results/prfreq/pop0.prfreq.fs"
     threads: 1
     run:
+        contig = species.get_contig('chr21')
+        seq_len = contig.recombination_map.sequence_length
+
         ts = tskit.load(input[0])
         samps = ts.samples()[0:100]
         mut_type = np.zeros(ts.num_sites)
@@ -155,8 +162,8 @@ rule generate_fs:
         # See https://github.com/paula-tataru/polyDFE/issues/3
         neu_fs_proj = neu_fs.project([20])
         nonneu_fs_proj = nonneu_fs.project([20])
-        neu_len = round(248956 * 0.3)
-        nonneu_len = round(248956 * 0.7)
+        neu_len = round(seq_len * 0.3)
+        nonneu_len = round(seq_len * 0.7)
         with open(output[2], 'w') as o:
             o.write("1 1 20\n")
             o.write(" ".join([str(round(f)) for f in neu_fs_proj[1:-1]]) + " " + str(neu_len) + "\n")
@@ -184,7 +191,7 @@ rule generate_fs:
             '[model_commands]',
             'model: SNP_1',
             'n: ' + str(nonneu_fs.sample_sizes[0]),
-            'm: 248956',
+            'm: ' + str(seq_len),
             'folded: false',
             'sfs: ' + ", ".join([str(round(f)) for f in nonneu_fs.data[1:-1]]),
             'dfe: continuous',
@@ -227,7 +234,7 @@ rule dadi_infer_dm:
         "results/dadi/pop0.two_epoch_1d.InferDM.opts.0"
     threads: 8
     shell:
-        "dadi-cli InferDM --fs {input} --model {demo_model} --p0 {demo_p0} --ubounds {demo_ubounds} --lbounds {demo_lbounds} --output-prefix results/dadi/pop0.two_epoch_1d --thread 100 --grids 300 400 500"
+        "dadi-cli InferDM --fs {input} --model {demo_model} --p0 {demo_p0} --ubounds {demo_ubounds} --lbounds {demo_lbounds} --output-prefix results/dadi/pop0.two_epoch_1d --optimizations 100 --grids 300 400 500"
 
 rule dadi_bestfit_dm:
     input: rules.dadi_infer_dm.output
@@ -243,7 +250,7 @@ rule dadi_generate_cache:
         "results/dadi/pop0.two_epoch.sel.spectra.bpkl"
     threads: 8
     shell:
-        "dadi-cli GenerateCache --model two_epoch --demo-popt {input} --sample-size 100 --output {output} --mp --grids 800 1000 1200 --gamma-pts 500"
+        "dadi-cli GenerateCache --model two_epoch --demo-popt {input} --sample-size 100 --output {output} --mp --grids 800 1000 1200 --gamma-pts 2000"
 
 rule dadi_infer_dfe:
     input:
@@ -254,7 +261,7 @@ rule dadi_infer_dfe:
         "results/dadi/pop0.two_epoch_1d.gamma.InferDFE.opts.0"
     threads: 8
     shell:
-        "dadi-cli InferDFE --fs {input[0]} --cache1d {input[1]} --demo-popt {input[2]} --output-prefix results/dadi/pop0.two_epoch_1d.gamma --pdf1d {dfe_model} --p0 {dfe_p0} --ubounds {dfe_ubounds} --lbounds {dfe_lbounds} --ratio 2.31 --thread 100"
+        "dadi-cli InferDFE --fs {input[0]} --cache1d {input[1]} --demo-popt {input[2]} --output-prefix results/dadi/pop0.two_epoch_1d.gamma --pdf1d {dfe_model} --p0 {dfe_p0} --ubounds {dfe_ubounds} --lbounds {dfe_lbounds} --ratio 2.31 --optimizations 100"
 
 rule dadi_bestfit_dfe:
     input: rules.dadi_infer_dfe.output
@@ -282,7 +289,7 @@ rule run_polydfe:
         "results/polyDFE/pop0.polyDFE.results"
     threads: 1
     shell:
-        "./polyDFE-2.0-linux-64-bit -d results/polyDFE/pop0.polyDFE.fs -m C -i config/polyDFE/polyDFE_init_models.txt 1 -e > {output[0]}"
+        "polyDFE-2.0-linux-64-bit -d results/polyDFE/pop0.polyDFE.fs -m C -i config/polyDFE/polyDFE_init_models.txt 1 -e > {output[0]}"
 
 #rule plot_polydfe_results
 
@@ -306,15 +313,15 @@ rule run_dfe_alpha:
 # anavar
 # ###############################################################################
 
-rule run_anavar:
-    input:
-        "results/anavar/pop0.anavar.ctl.txt"
-    output:
-        "results/anavar/pop0.anavar.results",
-        "results/anavar/pop0.anavar.log"
-    threads: 1
-    shell:
-        "anavar {input[0]} {output[0]} {output[1]}"
+#rule run_anavar:
+#    input:
+#        "results/anavar/pop0.anavar.ctl.txt"
+#    output:
+#        "results/anavar/pop0.anavar.results",
+#        "results/anavar/pop0.anavar.log"
+#    threads: 1
+#    shell:
+#        "anavar {input[0]} {output[0]} {output[1]}"
 
 
 # ###############################################################################
