@@ -69,7 +69,11 @@ rule all:
         #expand(output_dir + "/dadi/{seeds}/{chrms}/pop{ids}/pop{ids}.nonneu.fs", seeds=seed_array, chrms=chrm_list, ids=[0, 1, 2]),
         #expand(output_dir + "/polyDFE/{seeds}/{chrms}/pop{ids}/pop{ids}.polyDFE.fs", seeds=seed_array, chrms=chrm_list, ids=[0, 1, 2]),
         #expand(output_dir + "/dfe-alpha/{seeds}/{chrms}/pop{ids}.dfe-alpha.fs", seeds=seed_array, chrms=chrm_list, ids=[0, 1, 2]),
-        expand(output_dir + "/polyDFE/{seeds}/{chrms}/pop{ids}/pop{ids}.polyDFE.results", seeds=seed_array, chrms=chrm_list, ids=[0, 1, 2])
+        #expand(output_dir + "/polyDFE/{seeds}/{chrms}/pop{ids}/pop{ids}.polyDFE.results", seeds=seed_array, chrms=chrm_list, ids=[0, 1, 2])
+        #expand(output_dir + "/dfe-alpha/{seeds}/{chrms}/pop{ids}/pop{ids}.dfe-alpha.neu.config", seeds=seed_array, chrms=chrm_list, ids=[0, 1, 2]),
+        #expand(output_dir + "/dfe-alpha/{seeds}/{chrms}/pop{ids}/pop{ids}.dfe-alpha.nonneu.config", seeds=seed_array, chrms=chrm_list, ids=[0, 1, 2]),
+        #expand(output_dir + "/dfe-alpha/{seeds}/{chrms}/pop{ids}/pop{ids}.dfe-alpha.fs", seeds=seed_array, chrms=chrm_list, ids=[0, 1, 2])
+        expand(output_dir + "/dfe-alpha/{seeds}/{chrms}/pop{ids}/nonneu/est_dfe.out", seeds=seed_array, chrms=chrm_list, ids=[0, 1, 2])
 
 #rule all:
 #    input:
@@ -145,10 +149,12 @@ rule generate_fs:
         #"results/simulated_data/986507084/sim_OutOfAfrica_3G09_HuberDFE_chr21.trees"
         output_dir + "/simulated_data/{seeds}/sim_OutOfAfrica_3G09_HuberDFE_{chrms}.trees"
     output:
-        output_dir + "/dadi/{seeds}/{chrms}/pop{ids}/pop{ids}.neu.fs",
-        output_dir + "/dadi/{seeds}/{chrms}/pop{ids}/pop{ids}.nonneu.fs",
-        output_dir + "/polyDFE/{seeds}/{chrms}/pop{ids}/pop{ids}.polyDFE.fs",
-        output_dir + "/dfe-alpha/{seeds}/{chrms}/pop{ids}.dfe-alpha.fs"
+        #output_dir + "/dadi/{seeds}/{chrms}/pop{ids}/pop{ids}.neu.fs",
+        #output_dir + "/dadi/{seeds}/{chrms}/pop{ids}/pop{ids}.nonneu.fs",
+        #output_dir + "/polyDFE/{seeds}/{chrms}/pop{ids}/pop{ids}.polyDFE.fs",
+        output_dir + "/dfe-alpha/{seeds}/{chrms}/pop{ids}/pop{ids}.dfe-alpha.neu.config",
+        output_dir + "/dfe-alpha/{seeds}/{chrms}/pop{ids}/pop{ids}.dfe-alpha.nonneu.config",
+        output_dir + "/dfe-alpha/{seeds}/{chrms}/pop{ids}/pop{ids}.dfe-alpha.fs"
 #        "results/dadi/pop0.nonneu.fs",
 #        "results/polyDFE/pop0.polyDFE.fs",
 #        "results/dfe-alpha/pop0.dfe-alpha.fs",
@@ -185,7 +191,39 @@ rule generate_fs:
             o.write(" ".join([str(round(f)) for f in nonneu_fs_proj[1:-1]]) + " " + str(nonneu_len) + "\n")
 
         ## For DFE-alpha
-        with open(output[3], 'w') as o:
+        dfe_alpha_neu_config = [
+            'data_path_1\t/xdisk/rgutenk/xinhuang/software/dfe-alpha-release-2.16/data',
+            'data_path_2\tdfe-alpha-three-epoch',
+            'sfs_input_file\t'+output_dir+"/dfe-alpha/"+wildcards.seeds+"/"+wildcards.chrms+"/pop"+wildcards.ids+"/pop"+wildcards.ids+".dfe-alpha.fs",
+            'est_dfe_results_dir\t'+output_dir+"/dfe-alpha/"+wildcards.seeds+"/"+wildcards.chrms+"/pop"+wildcards.ids+"/neu",
+            'fold\t0',
+            'epochs\t2',
+            'site_class\t0',
+            'search_n2\t1',
+            't2_variable\t1',
+            't2\t50'
+        ]
+        dfe_alpha_nonneu_config = [
+            'data_path_1\t/xdisk/rgutenk/xinhuang/software/dfe-alpha-release-2.16/data',
+            'data_path_2\tdfe-alpha-three-epoch',
+            'sfs_input_file\t'+output_dir+"/dfe-alpha/"+wildcards.seeds+"/"+wildcards.chrms+"/pop"+wildcards.ids+"/pop"+wildcards.ids+".dfe-alpha.fs",
+            'est_dfe_results_dir\t'+output_dir+"/dfe-alpha/"+wildcards.seeds+"/"+wildcards.chrms+"/pop"+wildcards.ids+"/nonneu",
+            'est_dfe_demography_results_file\t'+output_dir+"/dfe-alpha/"+wildcards.seeds+"/"+wildcards.chrms+"/pop"+wildcards.ids+"/neu/est_dfe.out",
+            'fold\t0',
+            'epochs\t2',
+            'site_class\t1',
+            'mean_s_variable\t1',
+            'mean_s\t-0.5',
+            'beta_variable\t1',
+            'beta\t0',
+            'p_additional\t0',
+            's_additional\t0',
+        ]
+        with open(output[0], 'w') as o:
+            o.write("\n".join(dfe_alpha_neu_config)+"\n")
+        with open(output[1], 'w') as o:
+            o.write("\n".join(dfe_alpha_nonneu_config)+"\n")
+        with open(output[2], 'w') as o:
             o.write("1\n")
             o.write(str(len(neu_fs)-1)+"\n")
             o.write(" ".join([str(round(f)) for f in nonneu_fs.data]) + "\n")
@@ -316,12 +354,13 @@ rule run_polydfe:
 
 rule run_dfe_alpha:
     input:
-        "config/dfe-alpha/dfe-alpha.neu.config",
-        "config/dfe-alpha/dfe-alpha.nonneu.config",
-        "results/dfe-alpha/pop0.dfe-alpha.fs"
-    output: "results/dfe-alpha/nonneu/est_dfe.out"
+        output_dir + "/dfe-alpha/{seeds}/{chrms}/pop{ids}/pop{ids}.dfe-alpha.neu.config",
+        output_dir + "/dfe-alpha/{seeds}/{chrms}/pop{ids}/pop{ids}.dfe-alpha.nonneu.config",
+        output_dir + "/dfe-alpha/{seeds}/{chrms}/pop{ids}/pop{ids}.dfe-alpha.fs"
+    output:
+        output_dir + "/dfe-alpha/{seeds}/{chrms}/pop{ids}/nonneu/est_dfe.out"
     threads: 1
-    resources: time_min=2880, mem_mb=10000, cpus=1
+    resources: time_min=60, mem_mb=5000, cpus=1
     shell:
         "est_dfe -c {input[0]}; est_dfe -c {input[1]}"
 
