@@ -63,11 +63,13 @@ def HuberDFE():
 #rule all:
 #    input: expand(output_dir + "/simulated_data/{seeds}/sim_OutOfAfrica_3G09_HuberDFE_{chrms}.trees", seeds=seed_array, chrms=chrm_list) 
 
-## Run only generating the frequency spectra
 rule all:
     input: 
-        expand(output_dir + "/dadi/{seeds}/{chrms}/pop{ids}/pop{ids}.neu.fs", seeds=seed_array, chrms=chrm_list, ids=[0, 1, 2]),
-        expand(output_dir + "/dadi/{seeds}/{chrms}/pop{ids}/pop{ids}.nonneu.fs", seeds=seed_array, chrms=chrm_list, ids=[0, 1, 2])
+        #expand(output_dir + "/dadi/{seeds}/{chrms}/pop{ids}/pop{ids}.neu.fs", seeds=seed_array, chrms=chrm_list, ids=[0, 1, 2]),
+        #expand(output_dir + "/dadi/{seeds}/{chrms}/pop{ids}/pop{ids}.nonneu.fs", seeds=seed_array, chrms=chrm_list, ids=[0, 1, 2]),
+        #expand(output_dir + "/polyDFE/{seeds}/{chrms}/pop{ids}/pop{ids}.polyDFE.fs", seeds=seed_array, chrms=chrm_list, ids=[0, 1, 2]),
+        #expand(output_dir + "/dfe-alpha/{seeds}/{chrms}/pop{ids}.dfe-alpha.fs", seeds=seed_array, chrms=chrm_list, ids=[0, 1, 2]),
+        expand(output_dir + "/polyDFE/{seeds}/{chrms}/pop{ids}/pop{ids}.polyDFE.results", seeds=seed_array, chrms=chrm_list, ids=[0, 1, 2])
 
 #rule all:
 #    input:
@@ -144,8 +146,9 @@ rule generate_fs:
         output_dir + "/simulated_data/{seeds}/sim_OutOfAfrica_3G09_HuberDFE_{chrms}.trees"
     output:
         output_dir + "/dadi/{seeds}/{chrms}/pop{ids}/pop{ids}.neu.fs",
-        output_dir + "/dadi/{seeds}/{chrms}/pop{ids}/pop{ids}.nonneu.fs"
-#        "results/dadi/pop0.neu.fs", 
+        output_dir + "/dadi/{seeds}/{chrms}/pop{ids}/pop{ids}.nonneu.fs",
+        output_dir + "/polyDFE/{seeds}/{chrms}/pop{ids}/pop{ids}.polyDFE.fs",
+        output_dir + "/dfe-alpha/{seeds}/{chrms}/pop{ids}.dfe-alpha.fs"
 #        "results/dadi/pop0.nonneu.fs",
 #        "results/polyDFE/pop0.polyDFE.fs",
 #        "results/dfe-alpha/pop0.dfe-alpha.fs",
@@ -163,33 +166,32 @@ rule generate_fs:
         else: samps = ts.samples()[:sizes[index]]
         mut_afs = generate_fs_from_ts(ts, samps)
 
-        # For dadi
+        ## For dadi
         nonneu_fs = dadi.Spectrum(mut_afs[:,0])
         neu_fs = dadi.Spectrum(mut_afs[:,1])
-
         neu_fs.to_file(output[0])
         nonneu_fs.to_file(output[1])
 
-        # For polyDFE
-        # Project down to 20 chromosomes
-        # See https://github.com/paula-tataru/polyDFE/issues/3
+        ## For polyDFE
+        ## Project down to 20 chromosomes
+        ## See https://github.com/paula-tataru/polyDFE/issues/3
         neu_fs_proj = neu_fs.project([20])
         nonneu_fs_proj = nonneu_fs.project([20])
         neu_len = round(seq_len * 0.3)
         nonneu_len = round(seq_len * 0.7)
-        #with open(output[2], 'w') as o:
-        #    o.write("1 1 20\n")
-        #    o.write(" ".join([str(round(f)) for f in neu_fs_proj[1:-1]]) + " " + str(neu_len) + "\n")
-        #    o.write(" ".join([str(round(f)) for f in nonneu_fs_proj[1:-1]]) + " " + str(nonneu_len) + "\n")
+        with open(output[2], 'w') as o:
+            o.write("1 1 20\n")
+            o.write(" ".join([str(round(f)) for f in neu_fs_proj[1:-1]]) + " " + str(neu_len) + "\n")
+            o.write(" ".join([str(round(f)) for f in nonneu_fs_proj[1:-1]]) + " " + str(nonneu_len) + "\n")
 
-        # For DFE-alpha
-        #with open(output[3], 'w') as o:
-        #    o.write("1\n")
-        #    o.write(str(len(neu_fs)-1)+"\n")
-        #    o.write(" ".join([str(round(f)) for f in nonneu_fs.data]) + "\n")
-        #    o.write(" ".join([str(round(f)) for f in neu_fs.data]) + "\n")
+        ## For DFE-alpha
+        with open(output[3], 'w') as o:
+            o.write("1\n")
+            o.write(str(len(neu_fs)-1)+"\n")
+            o.write(" ".join([str(round(f)) for f in nonneu_fs.data]) + "\n")
+            o.write(" ".join([str(round(f)) for f in neu_fs.data]) + "\n")
 
-        # For anavar
+        ## For anavar
         #anavar_alg_cmd = [
         #    '[algorithm_commands]',
         #    'search_algorithm: NLOPT_LD_SLSQP',
@@ -221,7 +223,7 @@ rule generate_fs:
         #    o.write("\n".join(anavar_alg_cmd)+"\n\n\n")
         #    o.write("\n".join(anavar_mdl_cmd)+"\n")
 
-        # For prfreq
+        ## For prfreq
         #with open(output[5], 'w') as o:
         #    for d in nonneu_fs.data[1:]:
         #        o.write(f"{d}\n")
@@ -242,12 +244,12 @@ dfe_ubounds = '1 50000'
 
 rule dadi_infer_dm:
     input: 
-        "results/dadi/pop0.neu.fs"
+        output_dir + "/dadi/{seeds}/{chrms}/pop{ids}/pop{ids}.neu.fs"
     output:
-        "results/dadi/pop0.two_epoch_1d.InferDM.opts.0"
+        output_dir + "/dadi/{seeds}/{chrms}/pop{ids}/pop{ids}.two_epoch.InferDM.opts.0"
     threads: 8
     shell:
-        "dadi-cli InferDM --fs {input} --model {demo_model} --p0 {demo_p0} --ubounds {demo_ubounds} --lbounds {demo_lbounds} --output-prefix results/dadi/pop0.two_epoch_1d --optimizations 100 --grids 300 400 500"
+        "dadi-cli InferDM --fs {input} --model {demo_model} --p0 {demo_p0} --ubounds {demo_ubounds} --lbounds {demo_lbounds} --output-prefix results/dadi/{seeds}/{chrms}/pop{ids}/pop{ids}.two_epoch --optimizations 100 --grids 300 400 500"
 
 rule dadi_bestfit_dm:
     input: rules.dadi_infer_dm.output
@@ -297,12 +299,14 @@ rule dadi_plot_results:
 # ###############################################################################
 
 rule run_polydfe:
-    input: "results/polyDFE/pop0.polyDFE.fs"
+    input: 
+        output_dir + "/polyDFE/{seeds}/{chrms}/pop{ids}/pop{ids}.polyDFE.fs"
     output: 
-        "results/polyDFE/pop0.polyDFE.results"
+        output_dir + "/polyDFE/{seeds}/{chrms}/pop{ids}/pop{ids}.polyDFE.results"
     threads: 1
+    resources: time_min=60, mem_mb=5000, cpus=1
     shell:
-        "polyDFE-2.0-linux-64-bit -d results/polyDFE/pop0.polyDFE.fs -m C -i config/polyDFE/polyDFE_init_models.txt 1 -e > {output[0]}"
+        "polyDFE-2.0-linux-64-bit -d {input} -m C -i config/polyDFE/polyDFE_init_models.txt 1 -e > {output[0]}"
 
 #rule plot_polydfe_results
 
@@ -317,6 +321,7 @@ rule run_dfe_alpha:
         "results/dfe-alpha/pop0.dfe-alpha.fs"
     output: "results/dfe-alpha/nonneu/est_dfe.out"
     threads: 1
+    resources: time_min=2880, mem_mb=10000, cpus=1
     shell:
         "est_dfe -c {input[0]}; est_dfe -c {input[1]}"
 
