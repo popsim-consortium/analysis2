@@ -486,6 +486,11 @@ rule plot_results:
         dadi_pop0_Es = dadi_pop0['shape']*dadi_pop0['scale']/(2*dadi_pop0_Nes)
         dadi_pop1_Es = dadi_pop1['shape']*dadi_pop1['scale']/(2*dadi_pop1_Nes)
         dadi_pop2_Es = dadi_pop2['shape']*dadi_pop2['scale']/(2*dadi_pop2_Nes)
+
+        ## theta_bar = 4*Ne*mu
+        ## S_d = 4*Ne*E(s)
+        ## E(s) = mu*S_d/theta_bar
+        ## See Fig. 1 in doi: 10.1534/genetics.117.300323
         polydfe_pop0_Es = abs(mu*polydfe_pop0['S_d']/polydfe_pop0['theta_bar'])
         polydfe_pop1_Es = abs(mu*polydfe_pop1['S_d']/polydfe_pop1['theta_bar'])
         polydfe_pop2_Es = abs(mu*polydfe_pop2['S_d']/polydfe_pop2['theta_bar'])
