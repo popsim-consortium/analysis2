@@ -73,13 +73,14 @@ rule all:
         #expand(output_dir + "/polyDFE/{seeds}/{chrms}/pop{ids}/pop{ids}.polyDFE.results", seeds=seed_array, chrms=chrm_list, ids=[0, 1, 2]),
         #expand(output_dir + "/dfe-alpha/{seeds}/{chrms}/pop{ids}/pop{ids}.dfe-alpha.neu.config", seeds=seed_array, chrms=chrm_list, ids=[0, 1, 2]),
         #expand(output_dir + "/dfe-alpha/{seeds}/{chrms}/pop{ids}/pop{ids}.dfe-alpha.nonneu.config", seeds=seed_array, chrms=chrm_list, ids=[0, 1, 2]),
-        #expand(output_dir + "/dfe-alpha/{seeds}/{chrms}/pop{ids}/pop{ids}.dfe-alpha.fs", seeds=seed_array, chrms=chrm_list, ids=[0, 1, 2])
-        #expand(output_dir + "/dfe-alpha/{seeds}/{chrms}/pop{ids}/nonneu/est_dfe.out", seeds=seed_array, chrms=chrm_list, ids=[0, 1, 2])
+        #expand(output_dir + "/dfe-alpha/{seeds}/{chrms}/pop{ids}/pop{ids}.dfe-alpha.fs", seeds=seed_array, chrms=chrm_list, ids=[0, 1, 2]),
+        #expand(output_dir + "/dfe-alpha/{seeds}/{chrms}/pop{ids}/nonneu/est_dfe.out", seeds=seed_array, chrms=chrm_list, ids=[0, 1, 2]),
         #expand(output_dir + "/dadi/{seeds}/{chrms}/pop{ids}/pop{ids}.two_epoch.InferDM.opts.0", seeds=seed_array, chrms=chrm_list, ids=[0, 1, 2])
         #expand(output_dir + "/dadi/{seeds}/{chrms}/pop{ids}/pop{ids}.two_epoch.gamma.InferDFE.bestfits", seeds=seed_array, chrms=chrm_list, ids=[0, 1, 2])
         #expand(output_dir + "/polyDFE/{seeds}/{chrms}/pop{ids}/pop{ids}.polyDFE.bestfit", seeds=seed_array, chrms=chrm_list, ids=[0, 1, 2])
-        expand(output_dir + "/dadi/pop{ids}.dadi.dfe.bestfits", ids=[0, 1, 2]),
-        expand(output_dir + "/polyDFE/pop{ids}.polyDFE.bestfits", ids=[0, 1, 2])
+        #expand(output_dir + "/dadi/pop{ids}.dadi.dfe.bestfits", ids=[0, 1, 2]),
+        #expand(output_dir + "/polyDFE/pop{ids}.polyDFE.bestfits", ids=[0, 1, 2])
+        "plots/dfe.inference.benchmark.pdf"
 
 #rule all:
 #    input:
@@ -153,9 +154,9 @@ rule generate_fs:
     input:
         output_dir + "/simulated_data/{seeds}/sim_OutOfAfrica_3G09_HuberDFE_{chrms}.trees"
     output:
-        output_dir + "/dadi/{seeds}/{chrms}/pop{ids}/pop{ids}.neu.fs",
-        output_dir + "/dadi/{seeds}/{chrms}/pop{ids}/pop{ids}.nonneu.fs",
-        output_dir + "/polyDFE/{seeds}/{chrms}/pop{ids}/pop{ids}.polyDFE.fs",
+        #output_dir + "/dadi/{seeds}/{chrms}/pop{ids}/pop{ids}.neu.fs",
+        #output_dir + "/dadi/{seeds}/{chrms}/pop{ids}/pop{ids}.nonneu.fs",
+        #output_dir + "/polyDFE/{seeds}/{chrms}/pop{ids}/pop{ids}.polyDFE.fs",
         output_dir + "/dfe-alpha/{seeds}/{chrms}/pop{ids}/pop{ids}.dfe-alpha.neu.config",
         output_dir + "/dfe-alpha/{seeds}/{chrms}/pop{ids}/pop{ids}.dfe-alpha.nonneu.config",
         output_dir + "/dfe-alpha/{seeds}/{chrms}/pop{ids}/pop{ids}.dfe-alpha.fs"
@@ -216,15 +217,15 @@ rule generate_fs:
             'mean_s_variable\t1',
             'mean_s\t-0.5',
             'beta_variable\t1',
-            'beta\t0',
+            'beta\t0.5',
             'p_additional\t0',
             's_additional\t0',
         ]
-        with open(output[3], 'w') as o:
+        with open(output[0], 'w') as o:
             o.write("\n".join(dfe_alpha_neu_config)+"\n")
-        with open(output[4], 'w') as o:
+        with open(output[1], 'w') as o:
             o.write("\n".join(dfe_alpha_nonneu_config)+"\n")
-        with open(output[5], 'w') as o:
+        with open(output[2], 'w') as o:
             o.write("1\n")
             o.write(str(len(neu_fs)-1)+"\n")
             o.write(" ".join([str(round(f)) for f in nonneu_fs.data]) + "\n")
@@ -454,3 +455,77 @@ rule run_dfe_alpha:
 #    output:
 #    threads: 1
 #    shell:
+
+
+# ###############################################################################
+# plots
+# ###############################################################################
+
+rule plot_results:
+    input:
+        dadi_res = expand(output_dir + "/dadi/pop{ids}.dadi.dfe.bestfits", ids=[0, 1, 2]),
+        polydfe_res = expand(output_dir + "/polyDFE/pop{ids}.polyDFE.bestfits", ids=[0, 1, 2])
+    output:
+        "plots/dfe.inference.benchmark.pdf"
+    threads: 1
+    run:
+        import matplotlib.pyplot as plt
+        import pandas as pd
+        import matplotlib
+        matplotlib.use("Agg")
+
+        mu = 2.35e-8
+        seq_len = 46709982
+
+        dadi_pop0 = pd.read_csv(input.dadi_res[0], sep="\t")
+        dadi_pop1 = pd.read_csv(input.dadi_res[1], sep="\t")
+        dadi_pop2 = pd.read_csv(input.dadi_res[2], sep="\t")
+        polydfe_pop0 = pd.read_csv(input.polydfe_res[0], sep="\t")
+        polydfe_pop1 = pd.read_csv(input.polydfe_res[1], sep="\t")
+        polydfe_pop2 = pd.read_csv(input.polydfe_res[2], sep="\t")
+        dadi_pop0_Nes = dadi_pop0['theta']/(4*mu*seq_len*0.7)
+        dadi_pop1_Nes = dadi_pop1['theta']/(4*mu*seq_len*0.7)
+        dadi_pop2_Nes = dadi_pop2['theta']/(4*mu*seq_len*0.7)
+        dadi_pop0_Es = dadi_pop0['shape']*dadi_pop0['scale']/(2*dadi_pop0_Nes)
+        dadi_pop1_Es = dadi_pop1['shape']*dadi_pop1['scale']/(2*dadi_pop1_Nes)
+        dadi_pop2_Es = dadi_pop2['shape']*dadi_pop2['scale']/(2*dadi_pop2_Nes)
+        polydfe_pop0_Es = abs(mu*polydfe_pop0['S_d']/polydfe_pop0['theta_bar'])
+        polydfe_pop1_Es = abs(mu*polydfe_pop1['S_d']/polydfe_pop1['theta_bar'])
+        polydfe_pop2_Es = abs(mu*polydfe_pop2['S_d']/polydfe_pop2['theta_bar'])
+
+        fig = plt.figure(figsize=(6,6), dpi=300)
+
+        plt.subplot(2,2,1)
+        plt.ylabel('Shape parameter')
+        plt.xlabel('Population')
+        plt.boxplot([dadi_pop0['shape'], dadi_pop1['shape'], dadi_pop2['shape']])
+        plt.plot(plt.xlim(), [0.19,0.19], c='red')
+        plt.xticks([3,2,3],['YRI','CEU','CHB'])
+        plt.title('dadi')
+
+        plt.subplot(2,2,2)
+        plt.ylabel('|E(s)|')
+        plt.xlabel('Population')
+        plt.boxplot([dadi_pop0_Es, dadi_pop1_Es, dadi_pop2_Es])
+        plt.plot(plt.xlim(), [0.014,0.014], c='red')
+        plt.xticks([1,2,3],['YRI','CEU','CHB'])
+        plt.title('dadi')
+
+        plt.subplot(2,2,3)
+        plt.ylabel('Shape parameter')
+        plt.xlabel('Population')
+        plt.boxplot([polydfe_pop0['b'], polydfe_pop1['b'], polydfe_pop2['b']])
+        plt.plot(plt.xlim(), [0.19,0.19], c='red')
+        plt.xticks([1,2,3],['YRI','CEU','CHB'])
+        plt.title('polyDFE')
+
+        plt.subplot(2,2,4)
+        plt.ylabel('|E(s)|')
+        plt.xlabel('Population')
+        plt.boxplot([polydfe_pop0_Es, polydfe_pop1_Es, polydfe_pop2_Es])
+        plt.plot(plt.xlim(), [0.014,0.014], c='red')
+        plt.xticks([1,2,3],['YRI','CEU','CHB'])
+        plt.title('polyDFE')
+
+        fig.tight_layout()
+        plt.savefig(output[0])
