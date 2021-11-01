@@ -502,7 +502,7 @@ rule plot_results:
         plt.xlabel('Population')
         plt.boxplot([dadi_pop0['shape'], dadi_pop1['shape'], dadi_pop2['shape']])
         plt.plot(plt.xlim(), [0.19,0.19], c='red')
-        plt.xticks([3,2,3],['YRI','CEU','CHB'])
+        plt.xticks([1,2,3],['YRI','CEU','CHB'])
         plt.title('dadi')
 
         plt.subplot(2,2,2)
