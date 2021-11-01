@@ -80,7 +80,7 @@ rule all:
         #expand(output_dir + "/polyDFE/{seeds}/{chrms}/pop{ids}/pop{ids}.polyDFE.bestfit", seeds=seed_array, chrms=chrm_list, ids=[0, 1, 2])
         #expand(output_dir + "/dadi/pop{ids}.dadi.dfe.bestfits", ids=[0, 1, 2]),
         #expand(output_dir + "/polyDFE/pop{ids}.polyDFE.bestfits", ids=[0, 1, 2])
-        "plots/dfe.inference.benchmark.pdf"
+        expand("plots/{chrms}/dfe.inference.benchmark.pdf", chrms=chrm_list)
 
 #rule all:
 #    input:
@@ -342,9 +342,7 @@ rule combine_dadi_dfe_bestfits:
         pop1_res = expand(output_dir + "/dadi/{seeds}/{chrms}/pop1/pop1.two_epoch.gamma.InferDFE.bestfits", seeds=seed_array, chrms=chrm_list),
         pop2_res = expand(output_dir + "/dadi/{seeds}/{chrms}/pop2/pop2.two_epoch.gamma.InferDFE.bestfits", seeds=seed_array, chrms=chrm_list)
     output:
-        output_dir + "/dadi/pop0.dadi.dfe.bestfits",
-        output_dir + "/dadi/pop1.dadi.dfe.bestfits",
-        output_dir + "/dadi/pop2.dadi.dfe.bestfits"
+        expand(output_dir + "/dadi/{chrms}/pop{ids}.dadi.dfe.bestfits", chrms=chrm_list, ids=[0, 1, 2])
     threads: 1
     shell:
         """
@@ -400,9 +398,7 @@ rule combine_polydfe_bestfits:
         pop1_res = expand(output_dir + "/polyDFE/{seeds}/{chrms}/pop1/pop1.polyDFE.bestfit", seeds=seed_array, chrms=chrm_list),
         pop2_res = expand(output_dir + "/polyDFE/{seeds}/{chrms}/pop2/pop2.polyDFE.bestfit", seeds=seed_array, chrms=chrm_list)
     output:
-        output_dir + "/polyDFE/pop0.polyDFE.bestfits",
-        output_dir + "/polyDFE/pop1.polyDFE.bestfits",
-        output_dir + "/polyDFE/pop2.polyDFE.bestfits"
+        expand(output_dir + "/polyDFE/{chrms}/pop{ids}.polyDFE.bestfits", chrms=chrm_list, ids=[0, 1, 2])
     threads: 1
     shell:
         """
@@ -463,10 +459,10 @@ rule run_dfe_alpha:
 
 rule plot_results:
     input:
-        dadi_res = expand(output_dir + "/dadi/pop{ids}.dadi.dfe.bestfits", ids=[0, 1, 2]),
-        polydfe_res = expand(output_dir + "/polyDFE/pop{ids}.polyDFE.bestfits", ids=[0, 1, 2])
+        dadi_res = expand(output_dir + "/dadi/{chrms}/pop{ids}.dadi.dfe.bestfits", chrms=chrm_list, ids=[0, 1, 2]),
+        polydfe_res = expand(output_dir + "/polyDFE/{chrms}/pop{ids}.polyDFE.bestfits", chrms=chrm_list, ids=[0, 1, 2])
     output:
-        "plots/dfe.inference.benchmark.pdf"
+        "plots/{chrms}/dfe.inference.benchmark.pdf"
     threads: 1
     run:
         import matplotlib.pyplot as plt
@@ -474,8 +470,9 @@ rule plot_results:
         import matplotlib
         matplotlib.use("Agg")
 
-        mu = 2.35e-8
-        seq_len = 46709982
+        mu = model.mutation_rate
+        contig = species.get_contig(wildcards.chrms)
+        seq_len = contig.recombination_map.sequence_length
 
         dadi_pop0 = pd.read_csv(input.dadi_res[0], sep="\t")
         dadi_pop1 = pd.read_csv(input.dadi_res[1], sep="\t")
