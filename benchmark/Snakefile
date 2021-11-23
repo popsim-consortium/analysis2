@@ -45,7 +45,8 @@ if(config["chrm_list"] != "all"):
 
 seed_array = np.random.random_integers(1,2**31,replicates)
 
-def HuberDFE():
+# Select DFE model from catalog                                                                                                                   
+h17_dfe = species.get_dfe("Gamma_H17")
     """
     Return neutral and negative MutationType()s representing a human DFE.
     Huber et al. (2017)
