@@ -103,7 +103,7 @@ rule simulation:
     resources: time_min=2880, mem_mb=10000, cpus=1
     run:
         contig = species.get_contig(wildcards.chrms)
-        contig.clear_genomic_mutation_types()
+        contig.clear_dfes()
         samples = model.get_samples(*num_samples_per_population)  # YRI, CEU, CHB
         contig.add_genomic_element_type(
             intervals=np.array([[0, int(contig.recombination_map.sequence_length)]]),
