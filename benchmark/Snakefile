@@ -105,9 +105,9 @@ rule simulation:
         contig = species.get_contig(wildcards.chrms)
         contig.clear_dfes()
         samples = model.get_samples(*num_samples_per_population)  # YRI, CEU, CHB
-        contig.add_genomic_element_type(
+        contig.add_dfe(
             intervals=np.array([[0, int(contig.recombination_map.sequence_length)]]),
-            **HuberDFE(),
+            DFE=h17_dfe
         )
         contig.mutation_rate = 2.35e-8
         engine = stdpopsim.get_engine("slim")
