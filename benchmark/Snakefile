@@ -47,21 +47,6 @@ seed_array = np.random.random_integers(1,2**31,replicates)
 
 # Select DFE model from catalog                                                                                                                   
 h17_dfe = species.get_dfe("Gamma_H17")
-    """
-    Return neutral and negative MutationType()s representing a human DFE.
-    Huber et al. (2017)
-    """
-    neutral = stdpopsim.ext.MutationType()
-    gamma_shape = 0.19  # shape
-    gamma_mean = -0.014  # expected value
-    h = 0.5  # dominance coefficient
-    negative = stdpopsim.ext.MutationType(
-        dominance_coeff=h,
-        distribution_type="g",  # gamma distribution
-        distribution_args=[gamma_mean, gamma_shape],
-    )
-    # neutral mutations have 0 proportion because they are not simulated by SLiM
-    return {"mutation_types": [neutral, negative], "proportions": [0.0, 0.7]}
 
 ## Run only the simulations!
 #rule all:
