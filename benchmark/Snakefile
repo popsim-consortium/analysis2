@@ -49,14 +49,14 @@ seed_array = np.random.random_integers(1,2**31,replicates)
 h17_dfe = species.get_dfe("Gamma_H17")
 
 ## Run only the simulations!
-rule all:
-    input: expand(output_dir + "/simulated_data/{seeds}/sim_OutOfAfrica_3G09_HuberDFE_{chrms}.trees", seeds=seed_array, chrms=chrm_list) 
-
 #rule all:
-#    input: 
+#    input: expand(output_dir + "/simulated_data/{seeds}/sim_OutOfAfrica_3G09_HuberDFE_{chrms}.trees", seeds=seed_array, chrms=chrm_list) 
+
+rule all:
+    input: 
         #expand(output_dir + "/dadi/{seeds}/{chrms}/pop{ids}/pop{ids}.neu.fs", seeds=seed_array, chrms=chrm_list, ids=[0, 1, 2]),
         #expand(output_dir + "/dadi/{seeds}/{chrms}/pop{ids}/pop{ids}.nonneu.fs", seeds=seed_array, chrms=chrm_list, ids=[0, 1, 2]),
-        #expand(output_dir + "/polyDFE/{seeds}/{chrms}/pop{ids}/pop{ids}.polyDFE.results", seeds=seed_array, chrms=chrm_list, ids=[0, 1, 2]),
+        expand(output_dir + "/polyDFE/{seeds}/{chrms}/pop{ids}/pop{ids}.polyDFE.results", seeds=seed_array, chrms=chrm_list, ids=[0, 1, 2]),
         #expand(output_dir + "/dfe-alpha/{seeds}/{chrms}/pop{ids}/pop{ids}.dfe-alpha.neu.config", seeds=seed_array, chrms=chrm_list, ids=[0, 1, 2]),
         #expand(output_dir + "/dfe-alpha/{seeds}/{chrms}/pop{ids}/pop{ids}.dfe-alpha.nonneu.config", seeds=seed_array, chrms=chrm_list, ids=[0, 1, 2]),
         #expand(output_dir + "/dfe-alpha/{seeds}/{chrms}/pop{ids}/pop{ids}.dfe-alpha.fs", seeds=seed_array, chrms=chrm_list, ids=[0, 1, 2]),
@@ -136,18 +136,18 @@ def generate_fs_from_ts(ts, sample_sets=None):
 
     return mut_afs
 
-rule generate_fs:
+rule generate_dadi_fs:
     input:
         output_dir + "/simulated_data/{seeds}/sim_OutOfAfrica_3G09_HuberDFE_{chrms}.trees"
     output:
-        #output_dir + "/dadi/{seeds}/{chrms}/pop{ids}/pop{ids}.neu.fs",
-        #output_dir + "/dadi/{seeds}/{chrms}/pop{ids}/pop{ids}.nonneu.fs",
-        #output_dir + "/polyDFE/{seeds}/{chrms}/pop{ids}/pop{ids}.polyDFE.fs",
-        output_dir + "/dfe-alpha/{seeds}/{chrms}/pop{ids}/pop{ids}.dfe-alpha.neu.config",
-        output_dir + "/dfe-alpha/{seeds}/{chrms}/pop{ids}/pop{ids}.dfe-alpha.nonneu.config",
-        output_dir + "/dfe-alpha/{seeds}/{chrms}/pop{ids}/pop{ids}.dfe-alpha.fs"
+        output_dir + "/dadi/{seeds}/{chrms}/pop{ids}/pop{ids}.neu.fs",
+        output_dir + "/dadi/{seeds}/{chrms}/pop{ids}/pop{ids}.nonneu.fs",
+        #output_dir + "/dfe-alpha/{seeds}/{chrms}/pop{ids}/pop{ids}.dfe-alpha.neu.config",
+        #output_dir + "/dfe-alpha/{seeds}/{chrms}/pop{ids}/pop{ids}.dfe-alpha.nonneu.config",
+        #output_dir + "/dfe-alpha/{seeds}/{chrms}/pop{ids}/pop{ids}.dfe-alpha.fs"
 #        "results/anavar/pop0.anavar.ctl.txt",
 #        "results/prfreq/pop0.prfreq.fs"
+    resources: time_min=60, mem_mb=5000, cpus=1
     threads: 1
     run:
         contig = species.get_contig(wildcards.chrms)
@@ -355,6 +355,34 @@ rule combine_dadi_dfe_bestfits:
 # polyDFE
 # ###############################################################################
 
+rule generate_polydfe_fs:
+    input:
+        output_dir + "/simulated_data/{seeds}/sim_OutOfAfrica_3G09_HuberDFE_{chrms}.trees"
+    output:
+        output_dir + "/polyDFE/{seeds}/{chrms}/pop{ids}/pop{ids}.polyDFE.fs"
+    threads: 1
+    resources: time_min=60, mem_mb=5000, cpus=1
+    run:
+        contig = species.get_contig(wildcards.chrms)
+        seq_len = contig.recombination_map.sequence_length
+
+        ts = tskit.load(input[0])
+        index = int(wildcards.ids)
+        sizes = np.cumsum(num_samples_per_population)
+        if index != 0: samps = ts.samples()[sizes[index-1]:sizes[index-1]+20]
+        else: samps = ts.samples()[:20]
+        mut_afs = generate_fs_from_ts(ts, samps)
+
+        neu_fs = mut_afs[:,1]
+        nonneu_fs = mut_afs[:,0]
+
+        neu_len = round(seq_len * 0.3)
+        nonneu_len = round(seq_len * 0.7)
+        with open(output[0], 'w') as o:
+            o.write("1 1 20\n")
+            o.write(" ".join([str(round(f)) for f in neu_fs[1:-1]]) + " " + str(neu_len) + "\n")
+            o.write(" ".join([str(round(f)) for f in nonneu_fs[1:-1]]) + " " + str(nonneu_len) + "\n")
+
 rule run_polydfe:
     input: 
         output_dir + "/polyDFE/{seeds}/{chrms}/pop{ids}/pop{ids}.polyDFE.fs"
@@ -373,9 +401,9 @@ rule get_polydfe_bestfit:
     threads: 1
     shell:
         """
-        paste <(grep "Best joint likelihood" results/polyDFE/{wildcards.seeds}/{wildcards.chrms}/pop{wildcards.ids}/pop{wildcards.ids}.polyDFE.results | awk '{{print $6}}') \
-              <(grep eps_an results/polyDFE/{wildcards.seeds}/{wildcards.chrms}/pop{wildcards.ids}/pop{wildcards.ids}.polyDFE.results -A 3 | tail -1 | awk 'BEGIN{{OFS="\t"}}{{print $2,$3}}') \
-              <(grep eps_an results/polyDFE/{wildcards.seeds}/{wildcards.chrms}/pop{wildcards.ids}/pop{wildcards.ids}.polyDFE.results -A 1 | tail -1 | awk '{{print $3}}') > {output}
+        paste <(grep "Best joint likelihood" {output_dir}/polyDFE/{wildcards.seeds}/{wildcards.chrms}/pop{wildcards.ids}/pop{wildcards.ids}.polyDFE.results | awk '{{print $6}}') \
+              <(grep eps_an {output_dir}/polyDFE/{wildcards.seeds}/{wildcards.chrms}/pop{wildcards.ids}/pop{wildcards.ids}.polyDFE.results -A 3 | tail -1 | awk 'BEGIN{{OFS="\t"}}{{print $2,$3}}') \
+              <(grep eps_an {output_dir}/polyDFE/{wildcards.seeds}/{wildcards.chrms}/pop{wildcards.ids}/pop{wildcards.ids}.polyDFE.results -A 1 | tail -1 | awk '{{print $3}}') > {output}
         """
 
 rule combine_polydfe_bestfits:

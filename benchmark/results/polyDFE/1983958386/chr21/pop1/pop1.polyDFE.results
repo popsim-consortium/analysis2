@@ -1,0 +1,72 @@
+---- Running command
+---- ./polyDFE -d /xdisk/rgutenk/xinhuang/projects/stdpopsim2/analysis2/benchmark/results/polyDFE/1983958386/chr21/pop1/pop1.polyDFE.fs -m C -i config/polyDFE/polyDFE_init_models.txt 1 -e 
+---- Performing inference using model C
+
+---- Performing inference on /xdisk/rgutenk/xinhuang/projects/stdpopsim2/analysis2/benchmark/results/polyDFE/1983958386/chr21/pop1/pop1.polyDFE.fs
+----      with -i config/polyDFE/polyDFE_init_models.txt 1
+---- Data /xdisk/rgutenk/xinhuang/projects/stdpopsim2/analysis2/benchmark/results/polyDFE/1983958386/chr21/pop1/pop1.polyDFE.fs does not contain divergence counts. Using option -w.
+---- No mutation variability. Using Poisson likelihood.
+
+
+---- Calculating initial values
+
+-- Starting local optimization
+-- Optimizing all parameters
+  it     theta_bar           S_d             b           r 2           r 3           r 4           r 5           r 6           r 7           r 8           r 9          r 10          r 11          r 12          r 13          r 14          r 15          r 16          r 17          r 18          r 19           ln lk          grad status 
+   0 0.00036787282        -20000         0.208 0.60446168768 0.50746847720 0.49893307468 0.60232783705 0.56333656644 0.47934044616 0.54936954413 0.62851600387 0.62269641125 0.72337536372 0.61222114451 0.60271580989 0.80931134820 0.89912706110 0.90940834141 0.95305528613 1.12085354025             1 -2917.670552274 110.163859106   -2 
+ 181 0.00036734535 -2685.0707722 0.14537239379 0.60682034764 0.51762071403 0.50093753866 0.59642169878 0.55141291512 0.48756618168 0.55931914453 0.64142073833 0.62547084632 0.69643447963 0.60756057040 0.59312422948 0.81538285041 0.90503947843 0.86134827095 0.98695858529 1.10178995425 1.52251664601 -152.1369694801 0.00009878022    0 
+---- Best joint likelihood found -152.136969480190487 with gradient 0.00010
+
+---- Results for /xdisk/rgutenk/xinhuang/projects/stdpopsim2/analysis2/benchmark/results/polyDFE/1983958386/chr21/pop1/pop1.polyDFE.fs 
+--  Model: C
+--        eps_an     theta_bar             a 
+--             0 0.00036734535            -1 
+--           S_d             b           p_b           S_b 
+-- -2685.0707722 0.14537239379             0             0 
+--           r 2           r 3           r 4           r 5           r 6           r 7           r 8           r 9          r 10          r 11          r 12          r 13          r 14          r 15          r 16          r 17          r 18          r 19 
+-- 0.60682034764 0.51762071403 0.50093753866 0.59642169878 0.55141291512 0.48756618168 0.55931914453 0.64142073833 0.62547084632 0.69643447963 0.60756057040 0.59312422948 0.81538285041 0.90503947843 0.86134827095 0.98695858529 1.10178995425 1.52251664601 
+
+---- Expected P_neut(i), 0 < i < n (neutral SFS per site) 
+E[P_neut(1)] = 0.0003673454
+E[P_neut(2)] = 0.0001114563
+E[P_neut(3)] = 0.0000633819
+E[P_neut(4)] = 0.0000460043
+E[P_neut(5)] = 0.0000438185
+E[P_neut(6)] = 0.0000337598
+E[P_neut(7)] = 0.0000255865
+E[P_neut(8)] = 0.0000256829
+E[P_neut(9)] = 0.0000261803
+E[P_neut(10)] = 0.0000229764
+E[P_neut(11)] = 0.0000232575
+E[P_neut(12)] = 0.0000185987
+E[P_neut(13)] = 0.0000167601
+E[P_neut(14)] = 0.0000213948
+E[P_neut(15)] = 0.0000221641
+E[P_neut(16)] = 0.0000197758
+E[P_neut(17)] = 0.0000213267
+E[P_neut(18)] = 0.0000224854
+E[P_neut(19)] = 0.0000294363
+
+---- Expected P_sel(i), 0 < i < n (selected SFS per site) 
+E[P_sel(1)] = 0.0001527480
+E[P_sel(2)] = 0.0000401003
+E[P_sel(3)] = 0.0000213118
+E[P_sel(4)] = 0.0000148130
+E[P_sel(5)] = 0.0000136701
+E[P_sel(6)] = 0.0000102739
+E[P_sel(7)] = 0.0000076294
+E[P_sel(8)] = 0.0000075268
+E[P_sel(9)] = 0.0000075583
+E[P_sel(10)] = 0.0000065459
+E[P_sel(11)] = 0.0000065478
+E[P_sel(12)] = 0.0000051802
+E[P_sel(13)] = 0.0000046224
+E[P_sel(14)] = 0.0000058475
+E[P_sel(15)] = 0.0000060071
+E[P_sel(16)] = 0.0000053180
+E[P_sel(17)] = 0.0000056931
+E[P_sel(18)] = 0.0000059612
+E[P_sel(19)] = 0.0000077532
+
+---- alpha_dfe = 0.000000
+

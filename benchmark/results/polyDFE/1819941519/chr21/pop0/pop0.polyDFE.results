@@ -1,0 +1,73 @@
+---- Running command
+---- ./polyDFE -d /xdisk/rgutenk/xinhuang/projects/stdpopsim2/analysis2/benchmark/results/polyDFE/1819941519/chr21/pop0/pop0.polyDFE.fs -m C -i config/polyDFE/polyDFE_init_models.txt 1 -e 
+---- Performing inference using model C
+
+---- Performing inference on /xdisk/rgutenk/xinhuang/projects/stdpopsim2/analysis2/benchmark/results/polyDFE/1819941519/chr21/pop0/pop0.polyDFE.fs
+----      with -i config/polyDFE/polyDFE_init_models.txt 1
+---- Data /xdisk/rgutenk/xinhuang/projects/stdpopsim2/analysis2/benchmark/results/polyDFE/1819941519/chr21/pop0/pop0.polyDFE.fs does not contain divergence counts. Using option -w.
+---- No mutation variability. Using Poisson likelihood.
+
+
+---- Calculating initial values
+
+-- Starting local optimization
+-- Optimizing all parameters
+  it     theta_bar           S_d             b           r 2           r 3           r 4           r 5           r 6           r 7           r 8           r 9          r 10          r 11          r 12          r 13          r 14          r 15          r 16          r 17          r 18          r 19           ln lk          grad status 
+   0 0.00055676891        -20000         0.208 0.86593181235 0.78402973596 0.70648551653 0.65111509869 0.66136887977 0.58318379902 0.56190720328 0.58369648808 0.59856447064 0.58510638297 0.58292745449 0.52653165854 0.52396821327 0.46334273263 0.50858754165 0.49025890797 0.54447577544             1 -3537.365188020 148.986619195   -2 
+ 133 0.00055914071 -2177.3545311 0.16226425760 0.84223927206 0.77108101301 0.72675789379 0.65445495040 0.66233630345 0.58580581447 0.56890602540 0.59357467341 0.60040033445 0.58815921994 0.60111430116 0.51769273179 0.53466472241 0.45426628373 0.49520898868 0.48051697023 0.50430204125 0.52277486282 -160.8916730394 0.00291499637   -8 
+-- Local optimization: reached maximum number of likelihood evaluations allowed.
+---- Best joint likelihood found -160.891673039407010 with gradient 0.00291
+
+---- Results for /xdisk/rgutenk/xinhuang/projects/stdpopsim2/analysis2/benchmark/results/polyDFE/1819941519/chr21/pop0/pop0.polyDFE.fs 
+--  Model: C
+--        eps_an     theta_bar             a 
+--             0 0.00055914071            -1 
+--           S_d             b           p_b           S_b 
+-- -2177.3545311 0.16226425760             0             0 
+--           r 2           r 3           r 4           r 5           r 6           r 7           r 8           r 9          r 10          r 11          r 12          r 13          r 14          r 15          r 16          r 17          r 18          r 19 
+-- 0.84223927206 0.77108101301 0.72675789379 0.65445495040 0.66233630345 0.58580581447 0.56890602540 0.59357467341 0.60040033445 0.58815921994 0.60111430116 0.51769273179 0.53466472241 0.45426628373 0.49520898868 0.48051697023 0.50430204125 0.52277486282 
+
+---- Expected P_neut(i), 0 < i < n (neutral SFS per site) 
+E[P_neut(1)] = 0.0005591407
+E[P_neut(2)] = 0.0002354651
+E[P_neut(3)] = 0.0001437143
+E[P_neut(4)] = 0.0001015900
+E[P_neut(5)] = 0.0000731865
+E[P_neut(6)] = 0.0000617232
+E[P_neut(7)] = 0.0000467926
+E[P_neut(8)] = 0.0000397623
+E[P_neut(9)] = 0.0000368769
+E[P_neut(10)] = 0.0000335708
+E[P_neut(11)] = 0.0000298967
+E[P_neut(12)] = 0.0000280090
+E[P_neut(13)] = 0.0000222664
+E[P_neut(14)] = 0.0000213538
+E[P_neut(15)] = 0.0000169333
+E[P_neut(16)] = 0.0000173057
+E[P_neut(17)] = 0.0000158045
+E[P_neut(18)] = 0.0000156653
+E[P_neut(19)] = 0.0000153845
+
+---- Expected P_sel(i), 0 < i < n (selected SFS per site) 
+E[P_sel(1)] = 0.0002214414
+E[P_sel(2)] = 0.0000792540
+E[P_sel(3)] = 0.0000448370
+E[P_sel(4)] = 0.0000301945
+E[P_sel(5)] = 0.0000209964
+E[P_sel(6)] = 0.0000172232
+E[P_sel(7)] = 0.0000127629
+E[P_sel(8)] = 0.0000106379
+E[P_sel(9)] = 0.0000097021
+E[P_sel(10)] = 0.0000087025
+E[P_sel(11)] = 0.0000076481
+E[P_sel(12)] = 0.0000070797
+E[P_sel(13)] = 0.0000055668
+E[P_sel(14)] = 0.0000052850
+E[P_sel(15)] = 0.0000041519
+E[P_sel(16)] = 0.0000042064
+E[P_sel(17)] = 0.0000038102
+E[P_sel(18)] = 0.0000037477
+E[P_sel(19)] = 0.0000036539
+
+---- alpha_dfe = 0.000000
+
