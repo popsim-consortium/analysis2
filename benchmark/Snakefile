@@ -372,6 +372,7 @@ rule combine_dadi_dfe_bestfits:
         for l in {input.pop0_res}; do grep -v "#" $l > temp1; head -1 temp1 >> {output[0]}; done 
         for l in {input.pop1_res}; do grep -v "#" $l > temp1; head -1 temp1 >> {output[1]}; done
         for l in {input.pop2_res}; do grep -v "#" $l > temp1; head -1 temp1 >> {output[2]}; done
+        rm temp1
         """
 
 #rule dadi_plot_results:
