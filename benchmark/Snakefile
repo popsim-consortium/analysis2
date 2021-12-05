@@ -357,15 +357,6 @@ rule combine_dadi_dfe_bestfits:
     resources: time_min=60, mem_mb=5000, cpus=1
     shell:
         """
-        #for l in {input.pop0_res}; do 
-        #    grep -v '#' $l | head -1
-        #done | sed '1i#likelihood\tshape\tscale\ttheta' > {output[0]}
-        #for l in {input.pop1_res}; do 
-        #    grep -v '#' $l | head -1
-        #done | sed '1i#likelihood\tshape\tscale\ttheta' > {output[1]}
-        #for l in {input.pop2_res}; do 
-        #    grep -v '#' $l | head -1
-        #done | sed '1i#likelihood\tshape\tscale\ttheta' > {output[2]}
         echo "#likelihood\tshape\tscale\ttheta" > {output[0]}
         echo "#likelihood\tshape\tscale\ttheta" > {output[1]}
         echo "#likelihood\tshape\tscale\ttheta" > {output[2]}
@@ -559,7 +550,7 @@ rule plot_results:
         plt.boxplot([dadi_pop0_Es, dadi_pop1_Es, dadi_pop2_Es])
         plt.plot(plt.xlim(), [0.014,0.014], c='red')
         plt.xticks([1,2,3],['YRI','CEU','CHB'])
-        plt.ylim([0,0.04])
+        #plt.ylim([0,0.04])
         plt.title('dadi')
 
         plt.subplot(2,2,3)
@@ -577,7 +568,7 @@ rule plot_results:
         plt.boxplot([polydfe_pop0_Es, polydfe_pop1_Es, polydfe_pop2_Es])
         plt.plot(plt.xlim(), [0.014,0.014], c='red')
         plt.xticks([1,2,3],['YRI','CEU','CHB'])
-        plt.ylim([0,0.04])
+        #plt.ylim([0,0.04])
         plt.title('polyDFE')
 
         fig.tight_layout()
