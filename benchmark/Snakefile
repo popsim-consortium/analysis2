@@ -56,7 +56,7 @@ rule all:
     input: 
         #expand(output_dir + "/dadi/{seeds}/{chrms}/pop{ids}/pop{ids}.neu.fs", seeds=seed_array, chrms=chrm_list, ids=[0, 1, 2]),
         #expand(output_dir + "/dadi/{seeds}/{chrms}/pop{ids}/pop{ids}.nonneu.fs", seeds=seed_array, chrms=chrm_list, ids=[0, 1, 2]),
-        expand(output_dir + "/polyDFE/{seeds}/{chrms}/pop{ids}/pop{ids}.polyDFE.results", seeds=seed_array, chrms=chrm_list, ids=[0, 1, 2]),
+        #expand(output_dir + "/polyDFE/{seeds}/{chrms}/pop{ids}/pop{ids}.polyDFE.results", seeds=seed_array, chrms=chrm_list, ids=[0, 1, 2]),
         #expand(output_dir + "/dfe-alpha/{seeds}/{chrms}/pop{ids}/pop{ids}.dfe-alpha.neu.config", seeds=seed_array, chrms=chrm_list, ids=[0, 1, 2]),
         #expand(output_dir + "/dfe-alpha/{seeds}/{chrms}/pop{ids}/pop{ids}.dfe-alpha.nonneu.config", seeds=seed_array, chrms=chrm_list, ids=[0, 1, 2]),
         #expand(output_dir + "/dfe-alpha/{seeds}/{chrms}/pop{ids}/pop{ids}.dfe-alpha.fs", seeds=seed_array, chrms=chrm_list, ids=[0, 1, 2]),
@@ -66,7 +66,7 @@ rule all:
         #expand(output_dir + "/polyDFE/{seeds}/{chrms}/pop{ids}/pop{ids}.polyDFE.bestfit", seeds=seed_array, chrms=chrm_list, ids=[0, 1, 2])
         #expand(output_dir + "/dadi/pop{ids}.dadi.dfe.bestfits", ids=[0, 1, 2]),
         #expand(output_dir + "/polyDFE/pop{ids}.polyDFE.bestfits", ids=[0, 1, 2])
-#        expand("plots/{chrms}/dfe.inference.benchmark.pdf", chrms=chrm_list)
+        expand("plots/{chrms}/dfe.inference.benchmark.pdf", chrms=chrm_list)
 
 #rule all:
 #    input:
@@ -136,86 +136,86 @@ def generate_fs_from_ts(ts, sample_sets=None):
 
     return mut_afs
 
-rule generate_dadi_fs:
-    input:
-        output_dir + "/simulated_data/{seeds}/sim_OutOfAfrica_3G09_HuberDFE_{chrms}.trees"
-    output:
-        output_dir + "/dadi/{seeds}/{chrms}/pop{ids}/pop{ids}.neu.fs",
-        output_dir + "/dadi/{seeds}/{chrms}/pop{ids}/pop{ids}.nonneu.fs",
+#rule generate_fs:
+#    input:
+#        output_dir + "/simulated_data/{seeds}/sim_OutOfAfrica_3G09_HuberDFE_{chrms}.trees"
+#    output:
+        #output_dir + "/dadi/{seeds}/{chrms}/pop{ids}/pop{ids}.neu.fs",
+        #output_dir + "/dadi/{seeds}/{chrms}/pop{ids}/pop{ids}.nonneu.fs",
         #output_dir + "/dfe-alpha/{seeds}/{chrms}/pop{ids}/pop{ids}.dfe-alpha.neu.config",
         #output_dir + "/dfe-alpha/{seeds}/{chrms}/pop{ids}/pop{ids}.dfe-alpha.nonneu.config",
         #output_dir + "/dfe-alpha/{seeds}/{chrms}/pop{ids}/pop{ids}.dfe-alpha.fs"
 #        "results/anavar/pop0.anavar.ctl.txt",
 #        "results/prfreq/pop0.prfreq.fs"
-    resources: time_min=60, mem_mb=5000, cpus=1
-    threads: 1
-    run:
-        contig = species.get_contig(wildcards.chrms)
-        seq_len = contig.recombination_map.sequence_length
+#    resources: time_min=60, mem_mb=5000, cpus=1
+#    threads: 1
+#    run:
+#        contig = species.get_contig(wildcards.chrms)
+#        seq_len = contig.recombination_map.sequence_length
 
-        ts = tskit.load(input[0])
-        index = int(wildcards.ids)
-        sizes = np.cumsum(num_samples_per_population)
-        if index != 0: samps = ts.samples()[sizes[index-1]:sizes[index]]
-        else: samps = ts.samples()[:sizes[index]]
-        mut_afs = generate_fs_from_ts(ts, samps)
+#        ts = tskit.load(input[0])
+#        index = int(wildcards.ids)
+#        sizes = np.cumsum(num_samples_per_population)
+#        if index != 0: samps = ts.samples()[sizes[index-1]:sizes[index]]
+#        else: samps = ts.samples()[:sizes[index]]
+#        mut_afs = generate_fs_from_ts(ts, samps)
 
         ## For dadi
-        nonneu_fs = dadi.Spectrum(mut_afs[:,0])
-        neu_fs = dadi.Spectrum(mut_afs[:,1])
-        neu_fs.to_file(output[0])
-        nonneu_fs.to_file(output[1])
+#        nonneu_fs = dadi.Spectrum(mut_afs[:,0])
+#        neu_fs = dadi.Spectrum(mut_afs[:,1])
+#        neu_fs.to_file(output[0])
+#        nonneu_fs.to_file(output[1])
 
         ## For polyDFE
         ## Project down to 20 chromosomes
         ## See https://github.com/paula-tataru/polyDFE/issues/3
-        neu_fs_proj = neu_fs.project([20])
-        nonneu_fs_proj = nonneu_fs.project([20])
-        neu_len = round(seq_len * 0.3)
-        nonneu_len = round(seq_len * 0.7)
-        with open(output[2], 'w') as o:
-            o.write("1 1 20\n")
-            o.write(" ".join([str(round(f)) for f in neu_fs_proj[1:-1]]) + " " + str(neu_len) + "\n")
-            o.write(" ".join([str(round(f)) for f in nonneu_fs_proj[1:-1]]) + " " + str(nonneu_len) + "\n")
+#        neu_fs_proj = neu_fs.project([20])
+#        nonneu_fs_proj = nonneu_fs.project([20])
+#        neu_len = round(seq_len * 0.3)
+#        nonneu_len = round(seq_len * 0.7)
+#        with open(output[2], 'w') as o:
+#            o.write("1 1 20\n")
+#            o.write(" ".join([str(round(f)) for f in neu_fs_proj[1:-1]]) + " " + str(neu_len) + "\n")
+#            o.write(" ".join([str(round(f)) for f in nonneu_fs_proj[1:-1]]) + " " + str(nonneu_len) + "\n")
 
         ## For DFE-alpha
-        dfe_alpha_neu_config = [
-            'data_path_1\t/xdisk/rgutenk/xinhuang/software/dfe-alpha-release-2.16/data',
-            'data_path_2\tdfe-alpha-three-epoch',
-            'sfs_input_file\t'+output_dir+"/dfe-alpha/"+wildcards.seeds+"/"+wildcards.chrms+"/pop"+wildcards.ids+"/pop"+wildcards.ids+".dfe-alpha.fs",
-            'est_dfe_results_dir\t'+output_dir+"/dfe-alpha/"+wildcards.seeds+"/"+wildcards.chrms+"/pop"+wildcards.ids+"/neu",
-            'fold\t0',
-            'epochs\t2',
-            'site_class\t0',
-            'search_n2\t1',
-            't2_variable\t1',
-            't2\t50'
-        ]
-        dfe_alpha_nonneu_config = [
-            'data_path_1\t/xdisk/rgutenk/xinhuang/software/dfe-alpha-release-2.16/data',
-            'data_path_2\tdfe-alpha-three-epoch',
-            'sfs_input_file\t'+output_dir+"/dfe-alpha/"+wildcards.seeds+"/"+wildcards.chrms+"/pop"+wildcards.ids+"/pop"+wildcards.ids+".dfe-alpha.fs",
-            'est_dfe_results_dir\t'+output_dir+"/dfe-alpha/"+wildcards.seeds+"/"+wildcards.chrms+"/pop"+wildcards.ids+"/nonneu",
-            'est_dfe_demography_results_file\t'+output_dir+"/dfe-alpha/"+wildcards.seeds+"/"+wildcards.chrms+"/pop"+wildcards.ids+"/neu/est_dfe.out",
-            'fold\t0',
-            'epochs\t2',
-            'site_class\t1',
-            'mean_s_variable\t1',
-            'mean_s\t-0.5',
-            'beta_variable\t1',
-            'beta\t0.5',
-            'p_additional\t0',
-            's_additional\t0',
-        ]
-        with open(output[0], 'w') as o:
-            o.write("\n".join(dfe_alpha_neu_config)+"\n")
-        with open(output[1], 'w') as o:
-            o.write("\n".join(dfe_alpha_nonneu_config)+"\n")
-        with open(output[2], 'w') as o:
-            o.write("1\n")
-            o.write(str(len(neu_fs)-1)+"\n")
-            o.write(" ".join([str(round(f)) for f in nonneu_fs.data]) + "\n")
-            o.write(" ".join([str(round(f)) for f in neu_fs.data]) + "\n")
+#        dfe_alpha_neu_config = [
+#            'data_path_1\t/xdisk/rgutenk/xinhuang/software/dfe-alpha-release-2.16/data',
+#            'data_path_2\tdfe-alpha-three-epoch',
+#            'sfs_input_file\t'+output_dir+"/dfe-alpha/"+wildcards.seeds+"/"+wildcards.chrms+"/pop"+wildcards.ids+"/pop"+wildcards.ids+".dfe-alpha.fs",
+#            'est_dfe_results_dir\t'+output_dir+"/dfe-alpha/"+wildcards.seeds+"/"+wildcards.chrms+"/pop"+wildcards.ids+"/neu",
+#            'fold\t0',
+#            'epochs\t2',
+#            'site_class\t0',
+#            'search_n2\t1',
+#            't2_variable\t1',
+#            't2\t50'
+#        ]
+#        dfe_alpha_nonneu_config = [
+#            'data_path_1\t/xdisk/rgutenk/xinhuang/software/dfe-alpha-release-2.16/data',
+#            'data_path_2\tdfe-alpha-three-epoch',
+#            'sfs_input_file\t'+output_dir+"/dfe-alpha/"+wildcards.seeds+"/"+wildcards.chrms+"/pop"+wildcards.ids+"/pop"+wildcards.ids+".dfe-alpha.fs",
+#            'est_dfe_results_dir\t'+output_dir+"/dfe-alpha/"+wildcards.seeds+"/"+wildcards.chrms+"/pop"+wildcards.ids+"/nonneu",
+#            'est_dfe_demography_results_file\t'+output_dir+"/dfe-alpha/"+wildcards.seeds+"/"+wildcards.chrms+"/pop"+wildcards.ids+"/neu/est_dfe.out",
+#            'fold\t0',
+#            'epochs\t2',
+#            'site_class\t1',
+#            'mean_s_variable\t1',
+#            'mean_s\t-0.5',
+#            'beta_variable\t1',
+#            'beta\t0.5',
+#            'p_additional\t0',
+#            's_additional\t0',
+#        ]
+#        with open(output[0], 'w') as o:
+#            o.write("\n".join(dfe_alpha_neu_config)+"\n")
+#        with open(output[1], 'w') as o:
+#            o.write("\n".join(dfe_alpha_nonneu_config)+"\n")
+#        with open(output[2], 'w') as o:
+#            o.write("1\n")
+#            o.write(str(len(neu_fs)-1)+"\n")
+#            o.write(" ".join([str(round(f)) for f in nonneu_fs.data]) + "\n")
+#            o.write(" ".join([str(round(f)) for f in neu_fs.data]) + "\n")
 
         ## For anavar
         #anavar_alg_cmd = [
@@ -268,6 +268,30 @@ dfe_p0 = '0.5 1000'
 dfe_lbounds = '0 0'
 dfe_ubounds = '1 50000'
 
+rule generate_dadi_fs:
+    input:
+        output_dir + "/simulated_data/{seeds}/sim_OutOfAfrica_3G09_HuberDFE_{chrms}.trees"
+    output:
+        output_dir + "/dadi/{seeds}/{chrms}/pop{ids}/pop{ids}.neu.fs",
+        output_dir + "/dadi/{seeds}/{chrms}/pop{ids}/pop{ids}.nonneu.fs"
+    threads: 1
+    resources: time_min=60, mem_mb=5000, cpus=8
+    run:
+        contig = species.get_contig(wildcards.chrms)
+        seq_len = contig.recombination_map.sequence_length
+
+        ts = tskit.load(input[0])
+        index = int(wildcards.ids)
+        sizes = np.cumsum(num_samples_per_population)
+        if index != 0: samps = ts.samples()[sizes[index-1]:sizes[index]]
+        else: samps = ts.samples()[:sizes[index]]
+        mut_afs = generate_fs_from_ts(ts, samps)
+
+        nonneu_fs = dadi.Spectrum(mut_afs[:,0])
+        neu_fs = dadi.Spectrum(mut_afs[:,1])
+        neu_fs.to_file(output[0])
+        nonneu_fs.to_file(output[1])
+
 rule dadi_infer_dm:
     input: 
         output_dir + "/dadi/{seeds}/{chrms}/pop{ids}/pop{ids}.neu.fs"
@@ -276,7 +300,7 @@ rule dadi_infer_dm:
     threads: 8
     resources: time_min=60, mem_mb=5000, cpus=8
     shell:
-        "dadi-cli InferDM --fs {input} --model {demo_model} --p0 {demo_p0} --ubounds {demo_ubounds} --lbounds {demo_lbounds} --output-prefix {output_dir}/dadi/{wildcards.seeds}/{wildcards.chrms}/pop{wildcards.ids}/pop{wildcards.ids}.two_epoch --optimizations 100 --grids 300 400 500"
+        "dadi-cli InferDM --fs {input} --model {demo_model} --p0 {demo_p0} --ubounds {demo_ubounds} --lbounds {demo_lbounds} --output-prefix {output_dir}/dadi/{wildcards.seeds}/{wildcards.chrms}/pop{wildcards.ids}/pop{wildcards.ids}.two_epoch --optimizations 100 --grids 300 400 500 --threads {threads}"
 
 rule dadi_bestfit_dm:
     input: 
@@ -286,7 +310,7 @@ rule dadi_bestfit_dm:
     threads: 1
     resources: time_min=60, mem_mb=5000, cpus=1
     shell: 
-        "dadi-cli BestFit --input-prefix {output_dir}/dadi/{wildcards.seeds}/{wildcards.chrms}/pop{wildcards.ids}/pop{wildcards.ids}.two_epoch.InferDM --model {demo_model} --ubounds {demo_ubounds} --lbounds {demo_lbounds}"
+        "dadi-cli BestFit --input-prefix {output_dir}/dadi/{wildcards.seeds}/{wildcards.chrms}/pop{wildcards.ids}/pop{wildcards.ids}.two_epoch.InferDM --model {demo_model} --ubounds {demo_ubounds} --lbounds {demo_lbounds} --model {demo_model}"
 
 rule dadi_generate_cache:
     input:
@@ -310,7 +334,7 @@ rule dadi_infer_dfe:
     threads: 8
     resources: time_min=60, mem_mb=5000, cpus=8
     shell:
-        "dadi-cli InferDFE --fs {input[0]} --cache1d {input[1]} --demo-popt {input[2]} --output-prefix {output_dir}/dadi/{wildcards.seeds}/{wildcards.chrms}/pop{wildcards.ids}/pop{wildcards.ids}.two_epoch.gamma --pdf1d {dfe_model} --p0 {dfe_p0} --ubounds {dfe_ubounds} --lbounds {dfe_lbounds} --ratio 2.31 --optimizations 500"
+        "dadi-cli InferDFE --fs {input[0]} --cache1d {input[1]} --demo-popt {input[2]} --output-prefix {output_dir}/dadi/{wildcards.seeds}/{wildcards.chrms}/pop{wildcards.ids}/pop{wildcards.ids}.two_epoch.gamma --pdf1d {dfe_model} --p0 {dfe_p0} --ubounds {dfe_ubounds} --lbounds {dfe_lbounds} --ratio 2.31 --optimizations 500 --threads {threads}"
 
 rule dadi_bestfit_dfe:
     input:
@@ -320,7 +344,7 @@ rule dadi_bestfit_dfe:
     threads: 1
     resources: time_min=60, mem_mb=5000, cpus=1
     shell:
-        "dadi-cli BestFit --input-prefix {output_dir}/dadi/{wildcards.seeds}/{wildcards.chrms}/pop{wildcards.ids}/pop{wildcards.ids}.two_epoch.gamma.InferDFE --pdf gamma --ubounds {dfe_ubounds} --lbounds {dfe_lbounds}"
+        "dadi-cli BestFit --input-prefix {output_dir}/dadi/{wildcards.seeds}/{wildcards.chrms}/pop{wildcards.ids}/pop{wildcards.ids}.two_epoch.gamma.InferDFE --pdf gamma --ubounds {dfe_ubounds} --lbounds {dfe_lbounds} --model {demo_model}"
 
 rule combine_dadi_dfe_bestfits:
     input:
@@ -330,17 +354,24 @@ rule combine_dadi_dfe_bestfits:
     output:
         expand(output_dir + "/dadi/{chrms}/pop{ids}.dadi.dfe.bestfits", chrms=chrm_list, ids=[0, 1, 2])
     threads: 1
+    resources: time_min=60, mem_mb=5000, cpus=1
     shell:
         """
-        for l in {input.pop0_res}; do 
-            grep -v '#' $l | head -1
-        done | sed '1i#likelihood\tshape\tscale\ttheta' > {output[0]}
-        for l in {input.pop1_res}; do 
-            grep -v '#' $l | head -1
-        done | sed '1i#likelihood\tshape\tscale\ttheta' > {output[1]}
-        for l in {input.pop2_res}; do 
-            grep -v '#' $l | head -1
-        done | sed '1i#likelihood\tshape\tscale\ttheta' > {output[2]}
+        #for l in {input.pop0_res}; do 
+        #    grep -v '#' $l | head -1
+        #done | sed '1i#likelihood\tshape\tscale\ttheta' > {output[0]}
+        #for l in {input.pop1_res}; do 
+        #    grep -v '#' $l | head -1
+        #done | sed '1i#likelihood\tshape\tscale\ttheta' > {output[1]}
+        #for l in {input.pop2_res}; do 
+        #    grep -v '#' $l | head -1
+        #done | sed '1i#likelihood\tshape\tscale\ttheta' > {output[2]}
+        echo "#likelihood\tshape\tscale\ttheta" > {output[0]}
+        echo "#likelihood\tshape\tscale\ttheta" > {output[1]}
+        echo "#likelihood\tshape\tscale\ttheta" > {output[2]}
+        for l in {input.pop0_res}; do grep -v "#" $l > temp1; head -1 temp1 >> {output[0]}; done 
+        for l in {input.pop1_res}; do grep -v "#" $l > temp1; head -1 temp1 >> {output[1]}; done
+        for l in {input.pop2_res}; do grep -v "#" $l > temp1; head -1 temp1 >> {output[2]}; done
         """
 
 #rule dadi_plot_results:
@@ -478,6 +509,7 @@ rule plot_results:
     output:
         "plots/{chrms}/dfe.inference.benchmark.pdf"
     threads: 1
+    resources: time_min=60, mem_mb=5000, cpus=1
     run:
         import matplotlib.pyplot as plt
         import pandas as pd
