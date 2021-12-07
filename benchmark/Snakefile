@@ -1,0 +1,573 @@
+"""
+Snakefile for running DFE benchmark on stdpopsim.
+"""
+
+import os
+import numpy as np
+import stdpopsim
+import tskit
+import dadi
+
+configfile: "config/snakemake/config.yaml"
+
+np.random.seed(config["seed"])
+
+# ###############################################################################
+# GENERAL RULES & GLOBALS
+# ###############################################################################
+
+
+# The number of replicates of each analysis you would like to run
+replicates = config["replicates"]
+
+# Where you would like all output files from analysis to live
+output_dir = os.path.abspath(config["output_dir"])
+
+# The analysis species
+species = stdpopsim.get_species(config["species"])
+
+# The specific model you would like to run
+model = species.get_demographic_model(config["model"])
+
+# The number of samples to simulate for within each population
+num_samples_per_population = config["num_samples_per_population"]
+sample_sizes = dict()
+for i in range(len(num_samples_per_population)):
+    sample_sizes[str(i)] = num_samples_per_population[i]
+
+# The names of all chromosomes to simulate, separated by commas
+# Use "all" to simulate all chromsomes for the genome
+chrm_list = [chrom.id for chrom in species.genome.chromosomes]
+if "chrY" in chrm_list:
+    chrm_list.remove("chrY")
+if(config["chrm_list"] != "all"):
+    chrm_list = [chr for chr in config["chrm_list"].split(",")]
+
+seed_array = np.random.random_integers(1,2**31,replicates)
+
+# Select DFE model from catalog                                                                                                                   
+h17_dfe = species.get_dfe("Gamma_H17")
+
+## Run only the simulations!
+rule all:
+    input: expand(output_dir + "/simulated_data/{seeds}/sim_OutOfAfrica_3G09_HuberDFE_{chrms}.trees", seeds=seed_array, chrms=chrm_list) 
+
+#rule all:
+#    input: 
+        #expand(output_dir + "/dadi/{seeds}/{chrms}/pop{ids}/pop{ids}.neu.fs", seeds=seed_array, chrms=chrm_list, ids=[0, 1, 2]),
+        #expand(output_dir + "/dadi/{seeds}/{chrms}/pop{ids}/pop{ids}.nonneu.fs", seeds=seed_array, chrms=chrm_list, ids=[0, 1, 2]),
+        #expand(output_dir + "/polyDFE/{seeds}/{chrms}/pop{ids}/pop{ids}.polyDFE.results", seeds=seed_array, chrms=chrm_list, ids=[0, 1, 2]),
+        #expand(output_dir + "/dfe-alpha/{seeds}/{chrms}/pop{ids}/pop{ids}.dfe-alpha.neu.config", seeds=seed_array, chrms=chrm_list, ids=[0, 1, 2]),
+        #expand(output_dir + "/dfe-alpha/{seeds}/{chrms}/pop{ids}/pop{ids}.dfe-alpha.nonneu.config", seeds=seed_array, chrms=chrm_list, ids=[0, 1, 2]),
+        #expand(output_dir + "/dfe-alpha/{seeds}/{chrms}/pop{ids}/pop{ids}.dfe-alpha.fs", seeds=seed_array, chrms=chrm_list, ids=[0, 1, 2]),
+        #expand(output_dir + "/dfe-alpha/{seeds}/{chrms}/pop{ids}/nonneu/est_dfe.out", seeds=seed_array, chrms=chrm_list, ids=[0, 1, 2]),
+        #expand(output_dir + "/dadi/{seeds}/{chrms}/pop{ids}/pop{ids}.two_epoch.InferDM.opts.0", seeds=seed_array, chrms=chrm_list, ids=[0, 1, 2])
+        #expand(output_dir + "/dadi/{seeds}/{chrms}/pop{ids}/pop{ids}.two_epoch.gamma.InferDFE.bestfits", seeds=seed_array, chrms=chrm_list, ids=[0, 1, 2])
+        #expand(output_dir + "/polyDFE/{seeds}/{chrms}/pop{ids}/pop{ids}.polyDFE.bestfit", seeds=seed_array, chrms=chrm_list, ids=[0, 1, 2])
+        #expand(output_dir + "/dadi/pop{ids}.dadi.dfe.bestfits", ids=[0, 1, 2]),
+        #expand(output_dir + "/polyDFE/pop{ids}.polyDFE.bestfits", ids=[0, 1, 2])
+        #expand("plots/{chrms}/dfe.inference.benchmark.pdf", chrms=chrm_list)
+
+#rule all:
+#    input:
+#        "results/dadi/pop0.two_epoch_1d.gamma.mut.prop.pdf",
+#        "results/polyDFE/pop0.polyDFE.results",
+#        "results/dfe-alpha/nonneu/est_dfe.out",
+#        "results/anavar/pop0.anavar.ctl.txt",
+#        "results/anavar/pop0.anavar.results",
+#        "results/anavar/pop0.anavar.log",
+
+rule simulation:
+    input:
+    output:
+        output_dir + "/simulated_data/{seeds}/sim_OutOfAfrica_3G09_HuberDFE_{chrms}.trees"
+    threads: 1
+    resources: time_min=3000, mem_mb=10000, cpus=1
+    run:
+        contig = species.get_contig(wildcards.chrms)
+        contig.clear_dfes()
+        samples = model.get_samples(*num_samples_per_population)  # YRI, CEU, CHB
+        contig.add_dfe(
+            intervals=np.array([[0, int(contig.recombination_map.sequence_length)]]),
+            DFE=h17_dfe
+        )
+        contig.mutation_rate = 2.35e-8
+        engine = stdpopsim.get_engine("slim")
+        ts = engine.simulate(
+            model,
+            contig,
+            samples,
+            slim_scaling_factor=1,
+            slim_burn_in=10,
+            seed=wildcards.seeds,
+        )
+        ts.dump(output[0])
+
+def generate_fs_from_ts(ts, sample_sets=None):
+
+    def allele_counts(ts, sample_sets=None):
+        if sample_sets is None:
+            sample_sets = [ts.samples()]
+        def f(x):
+            return x
+        return ts.sample_count_stat(sample_sets, f, len(sample_sets),
+                                    span_normalise=False, windows='sites',
+                                    polarised=True, mode='site', strict=False)
+
+    mut_type = np.zeros(ts.num_sites)
+    for j, s in enumerate(ts.sites()):
+        mt = []
+        for m in s.mutations:
+            for md in m.metadata["mutation_list"]:
+                mt.append(md["mutation_type"])
+        if len(set(mt)) > 1:
+            mut_type[j] = 3
+        else:
+            mut_type[j] = mt[0]
+
+    freqs = allele_counts(ts, [sample_sets])
+    freqs = freqs.flatten().astype(int)
+    mut_afs = np.zeros((len(sample_sets)+1, 3), dtype='int64')
+    for k in range(3):
+        mut_afs[:, k] = np.bincount(freqs[mut_type == k+1], minlength=len(sample_sets) + 1)
+
+    return mut_afs
+
+#rule generate_fs:
+#    input:
+#        output_dir + "/simulated_data/{seeds}/sim_OutOfAfrica_3G09_HuberDFE_{chrms}.trees"
+#    output:
+        #output_dir + "/dadi/{seeds}/{chrms}/pop{ids}/pop{ids}.neu.fs",
+        #output_dir + "/dadi/{seeds}/{chrms}/pop{ids}/pop{ids}.nonneu.fs",
+        #output_dir + "/dfe-alpha/{seeds}/{chrms}/pop{ids}/pop{ids}.dfe-alpha.neu.config",
+        #output_dir + "/dfe-alpha/{seeds}/{chrms}/pop{ids}/pop{ids}.dfe-alpha.nonneu.config",
+        #output_dir + "/dfe-alpha/{seeds}/{chrms}/pop{ids}/pop{ids}.dfe-alpha.fs"
+#        "results/anavar/pop0.anavar.ctl.txt",
+#        "results/prfreq/pop0.prfreq.fs"
+#    resources: time_min=60, mem_mb=5000, cpus=1
+#    threads: 1
+#    run:
+#        contig = species.get_contig(wildcards.chrms)
+#        seq_len = contig.recombination_map.sequence_length
+
+#        ts = tskit.load(input[0])
+#        index = int(wildcards.ids)
+#        sizes = np.cumsum(num_samples_per_population)
+#        if index != 0: samps = ts.samples()[sizes[index-1]:sizes[index]]
+#        else: samps = ts.samples()[:sizes[index]]
+#        mut_afs = generate_fs_from_ts(ts, samps)
+
+        ## For dadi
+#        nonneu_fs = dadi.Spectrum(mut_afs[:,0])
+#        neu_fs = dadi.Spectrum(mut_afs[:,1])
+#        neu_fs.to_file(output[0])
+#        nonneu_fs.to_file(output[1])
+
+        ## For polyDFE
+        ## Project down to 20 chromosomes
+        ## See https://github.com/paula-tataru/polyDFE/issues/3
+#        neu_fs_proj = neu_fs.project([20])
+#        nonneu_fs_proj = nonneu_fs.project([20])
+#        neu_len = round(seq_len * 0.3)
+#        nonneu_len = round(seq_len * 0.7)
+#        with open(output[2], 'w') as o:
+#            o.write("1 1 20\n")
+#            o.write(" ".join([str(round(f)) for f in neu_fs_proj[1:-1]]) + " " + str(neu_len) + "\n")
+#            o.write(" ".join([str(round(f)) for f in nonneu_fs_proj[1:-1]]) + " " + str(nonneu_len) + "\n")
+
+        ## For DFE-alpha
+#        dfe_alpha_neu_config = [
+#            'data_path_1\t/xdisk/rgutenk/xinhuang/software/dfe-alpha-release-2.16/data',
+#            'data_path_2\tdfe-alpha-three-epoch',
+#            'sfs_input_file\t'+output_dir+"/dfe-alpha/"+wildcards.seeds+"/"+wildcards.chrms+"/pop"+wildcards.ids+"/pop"+wildcards.ids+".dfe-alpha.fs",
+#            'est_dfe_results_dir\t'+output_dir+"/dfe-alpha/"+wildcards.seeds+"/"+wildcards.chrms+"/pop"+wildcards.ids+"/neu",
+#            'fold\t0',
+#            'epochs\t2',
+#            'site_class\t0',
+#            'search_n2\t1',
+#            't2_variable\t1',
+#            't2\t50'
+#        ]
+#        dfe_alpha_nonneu_config = [
+#            'data_path_1\t/xdisk/rgutenk/xinhuang/software/dfe-alpha-release-2.16/data',
+#            'data_path_2\tdfe-alpha-three-epoch',
+#            'sfs_input_file\t'+output_dir+"/dfe-alpha/"+wildcards.seeds+"/"+wildcards.chrms+"/pop"+wildcards.ids+"/pop"+wildcards.ids+".dfe-alpha.fs",
+#            'est_dfe_results_dir\t'+output_dir+"/dfe-alpha/"+wildcards.seeds+"/"+wildcards.chrms+"/pop"+wildcards.ids+"/nonneu",
+#            'est_dfe_demography_results_file\t'+output_dir+"/dfe-alpha/"+wildcards.seeds+"/"+wildcards.chrms+"/pop"+wildcards.ids+"/neu/est_dfe.out",
+#            'fold\t0',
+#            'epochs\t2',
+#            'site_class\t1',
+#            'mean_s_variable\t1',
+#            'mean_s\t-0.5',
+#            'beta_variable\t1',
+#            'beta\t0.5',
+#            'p_additional\t0',
+#            's_additional\t0',
+#        ]
+#        with open(output[0], 'w') as o:
+#            o.write("\n".join(dfe_alpha_neu_config)+"\n")
+#        with open(output[1], 'w') as o:
+#            o.write("\n".join(dfe_alpha_nonneu_config)+"\n")
+#        with open(output[2], 'w') as o:
+#            o.write("1\n")
+#            o.write(str(len(neu_fs)-1)+"\n")
+#            o.write(" ".join([str(round(f)) for f in nonneu_fs.data]) + "\n")
+#            o.write(" ".join([str(round(f)) for f in neu_fs.data]) + "\n")
+
+        ## For anavar
+        #anavar_alg_cmd = [
+        #    '[algorithm_commands]',
+        #    'search_algorithm: NLOPT_LD_SLSQP',
+        #    'maxeval: 100000',
+        #    'maxtime: 600',
+        #    'num_searches: 100',
+        #    'nnoimp: 2',
+        #    'maximp: 3',
+        #    'optional: false'
+        #]
+        #anavar_mdl_cmd = [
+        #    '[model_commands]',
+        #    'model: SNP_1',
+        #    'n: ' + str(nonneu_fs.sample_sizes[0]),
+        #    'm: ' + str(seq_len),
+        #    'folded: false',
+        #    'sfs: ' + ", ".join([str(round(f)) for f in nonneu_fs.data[1:-1]]),
+        #    'dfe: continuous',
+        #    'distribution: reflected_gamma',
+        #    'theta_range: 0.1, 1000',
+        #    'shape_range: 0.1, 100',
+        #    'scale_range: 0.1, 100',
+        #    'e_range: 0, 1',
+        #    'constraint: no_pol_error',
+        #    'optional: false'
+        #]
+
+        #with open(output[4], 'w') as o:
+        #    o.write("\n".join(anavar_alg_cmd)+"\n\n\n")
+        #    o.write("\n".join(anavar_mdl_cmd)+"\n")
+
+        ## For prfreq
+        #with open(output[5], 'w') as o:
+        #    for d in nonneu_fs.data[1:]:
+        #        o.write(f"{d}\n")
+
+
+# ###############################################################################
+# dadi
+# ###############################################################################
+
+demo_model = 'two_epoch'
+demo_p0 = '5 5'
+demo_lbounds = '10e-3 10e-3' 
+demo_ubounds = '100 1'
+dfe_model = 'gamma'
+dfe_p0 = '0.5 1000'
+dfe_lbounds = '0 0'
+dfe_ubounds = '1 50000'
+
+rule generate_dadi_fs:
+    input:
+        output_dir + "/simulated_data/{seeds}/sim_OutOfAfrica_3G09_HuberDFE_{chrms}.trees"
+    output:
+        output_dir + "/dadi/{seeds}/{chrms}/pop{ids}/pop{ids}.neu.fs",
+        output_dir + "/dadi/{seeds}/{chrms}/pop{ids}/pop{ids}.nonneu.fs"
+    threads: 1
+    resources: time_min=60, mem_mb=5000, cpus=8
+    run:
+        contig = species.get_contig(wildcards.chrms)
+        seq_len = contig.recombination_map.sequence_length
+
+        ts = tskit.load(input[0])
+        index = int(wildcards.ids)
+        sizes = np.cumsum(num_samples_per_population)
+        if index != 0: samps = ts.samples()[sizes[index-1]:sizes[index]]
+        else: samps = ts.samples()[:sizes[index]]
+        mut_afs = generate_fs_from_ts(ts, samps)
+
+        nonneu_fs = dadi.Spectrum(mut_afs[:,0])
+        neu_fs = dadi.Spectrum(mut_afs[:,1])
+        neu_fs.to_file(output[0])
+        nonneu_fs.to_file(output[1])
+
+rule dadi_infer_dm:
+    input: 
+        output_dir + "/dadi/{seeds}/{chrms}/pop{ids}/pop{ids}.neu.fs"
+    output:
+        output_dir + "/dadi/{seeds}/{chrms}/pop{ids}/pop{ids}.two_epoch.InferDM.opts.0"
+    threads: 8
+    resources: time_min=60, mem_mb=5000, cpus=8
+    shell:
+        "dadi-cli InferDM --fs {input} --model {demo_model} --p0 {demo_p0} --ubounds {demo_ubounds} --lbounds {demo_lbounds} --output-prefix {output_dir}/dadi/{wildcards.seeds}/{wildcards.chrms}/pop{wildcards.ids}/pop{wildcards.ids}.two_epoch --optimizations 100 --grids 300 400 500 --threads {threads}"
+
+rule dadi_bestfit_dm:
+    input: 
+        output_dir + "/dadi/{seeds}/{chrms}/pop{ids}/pop{ids}.two_epoch.InferDM.opts.0"
+    output:
+        output_dir + "/dadi/{seeds}/{chrms}/pop{ids}/pop{ids}.two_epoch.InferDM.bestfits"
+    threads: 1
+    resources: time_min=60, mem_mb=5000, cpus=1
+    shell: 
+        "dadi-cli BestFit --input-prefix {output_dir}/dadi/{wildcards.seeds}/{wildcards.chrms}/pop{wildcards.ids}/pop{wildcards.ids}.two_epoch.InferDM --model {demo_model} --ubounds {demo_ubounds} --lbounds {demo_lbounds} --model {demo_model}"
+
+rule dadi_generate_cache:
+    input:
+        output_dir + "/dadi/{seeds}/{chrms}/pop{ids}/pop{ids}.two_epoch.InferDM.bestfits"
+    output:
+        output_dir + "/dadi/{seeds}/{chrms}/pop{ids}/pop{ids}.two_epoch.spectra.bpkl"
+    threads: 8
+    resources: time_min=60, mem_mb=5000, cpus=8
+    params:
+        sample_size = 100
+    shell:
+        "dadi-cli GenerateCache --model two_epoch --demo-popt {input} --sample-size {params.sample_size} --output {output} --mp --grids 800 1000 1200 --gamma-pts 2000"
+
+rule dadi_infer_dfe:
+    input:
+        output_dir + "/dadi/{seeds}/{chrms}/pop{ids}/pop{ids}.nonneu.fs",
+        output_dir + "/dadi/{seeds}/{chrms}/pop{ids}/pop{ids}.two_epoch.spectra.bpkl",
+        output_dir + "/dadi/{seeds}/{chrms}/pop{ids}/pop{ids}.two_epoch.InferDM.bestfits"
+    output:
+        output_dir + "/dadi/{seeds}/{chrms}/pop{ids}/pop{ids}.two_epoch.gamma.InferDFE.opts.0"
+    threads: 8
+    resources: time_min=60, mem_mb=5000, cpus=8
+    shell:
+        "dadi-cli InferDFE --fs {input[0]} --cache1d {input[1]} --demo-popt {input[2]} --output-prefix {output_dir}/dadi/{wildcards.seeds}/{wildcards.chrms}/pop{wildcards.ids}/pop{wildcards.ids}.two_epoch.gamma --pdf1d {dfe_model} --p0 {dfe_p0} --ubounds {dfe_ubounds} --lbounds {dfe_lbounds} --ratio 2.31 --optimizations 500 --threads {threads}"
+
+rule dadi_bestfit_dfe:
+    input:
+        output_dir + "/dadi/{seeds}/{chrms}/pop{ids}/pop{ids}.two_epoch.gamma.InferDFE.opts.0"
+    output:
+        output_dir + "/dadi/{seeds}/{chrms}/pop{ids}/pop{ids}.two_epoch.gamma.InferDFE.bestfits"
+    threads: 1
+    resources: time_min=60, mem_mb=5000, cpus=1
+    shell:
+        "dadi-cli BestFit --input-prefix {output_dir}/dadi/{wildcards.seeds}/{wildcards.chrms}/pop{wildcards.ids}/pop{wildcards.ids}.two_epoch.gamma.InferDFE --pdf gamma --ubounds {dfe_ubounds} --lbounds {dfe_lbounds} --model {demo_model}"
+
+rule combine_dadi_dfe_bestfits:
+    input:
+        pop0_res = expand(output_dir + "/dadi/{seeds}/{chrms}/pop0/pop0.two_epoch.gamma.InferDFE.bestfits", seeds=seed_array, chrms=chrm_list),
+        pop1_res = expand(output_dir + "/dadi/{seeds}/{chrms}/pop1/pop1.two_epoch.gamma.InferDFE.bestfits", seeds=seed_array, chrms=chrm_list),
+        pop2_res = expand(output_dir + "/dadi/{seeds}/{chrms}/pop2/pop2.two_epoch.gamma.InferDFE.bestfits", seeds=seed_array, chrms=chrm_list)
+    output:
+        expand(output_dir + "/dadi/{chrms}/pop{ids}.dadi.dfe.bestfits", chrms=chrm_list, ids=[0, 1, 2])
+    threads: 1
+    resources: time_min=60, mem_mb=5000, cpus=1
+    shell:
+        """
+        echo "#likelihood\tshape\tscale\ttheta" > {output[0]}
+        echo "#likelihood\tshape\tscale\ttheta" > {output[1]}
+        echo "#likelihood\tshape\tscale\ttheta" > {output[2]}
+        for l in {input.pop0_res}; do grep -v "#" $l > temp1; head -1 temp1 >> {output[0]}; done 
+        for l in {input.pop1_res}; do grep -v "#" $l > temp1; head -1 temp1 >> {output[1]}; done
+        for l in {input.pop2_res}; do grep -v "#" $l > temp1; head -1 temp1 >> {output[2]}; done
+        rm temp1
+        """
+
+#rule dadi_plot_results:
+#    input: rules.dadi_bestfit_dfe.output
+#    output:
+#        "results/dadi/pop0.two_epoch_1d.gamma.mut.prop.pdf"
+#    threads: 1
+#    shell:
+#        "dadi-cli Plot --dfe-popt {input} --pdf1d gamma --output {output} --mut-rate 2.35e-8 --seq-len 248956 --ratio 2.31"
+
+# ###############################################################################
+# polyDFE
+# ###############################################################################
+
+rule generate_polydfe_fs:
+    input:
+        output_dir + "/simulated_data/{seeds}/sim_OutOfAfrica_3G09_HuberDFE_{chrms}.trees"
+    output:
+        output_dir + "/polyDFE/{seeds}/{chrms}/pop{ids}/pop{ids}.polyDFE.fs"
+    threads: 1
+    resources: time_min=60, mem_mb=5000, cpus=1
+    run:
+        contig = species.get_contig(wildcards.chrms)
+        seq_len = contig.recombination_map.sequence_length
+
+        ts = tskit.load(input[0])
+        index = int(wildcards.ids)
+        sizes = np.cumsum(num_samples_per_population)
+        if index != 0: samps = ts.samples()[sizes[index-1]:sizes[index-1]+20]
+        else: samps = ts.samples()[:20]
+        mut_afs = generate_fs_from_ts(ts, samps)
+
+        neu_fs = mut_afs[:,1]
+        nonneu_fs = mut_afs[:,0]
+
+        neu_len = round(seq_len * 0.3)
+        nonneu_len = round(seq_len * 0.7)
+        with open(output[0], 'w') as o:
+            o.write("1 1 20\n")
+            o.write(" ".join([str(round(f)) for f in neu_fs[1:-1]]) + " " + str(neu_len) + "\n")
+            o.write(" ".join([str(round(f)) for f in nonneu_fs[1:-1]]) + " " + str(nonneu_len) + "\n")
+
+rule run_polydfe:
+    input: 
+        output_dir + "/polyDFE/{seeds}/{chrms}/pop{ids}/pop{ids}.polyDFE.fs"
+    output: 
+        output_dir + "/polyDFE/{seeds}/{chrms}/pop{ids}/pop{ids}.polyDFE.results"
+    threads: 1
+    resources: time_min=60, mem_mb=5000, cpus=1
+    shell:
+        "polyDFE-2.0-linux-64-bit -d {input} -m C -i config/polyDFE/polyDFE_init_models.txt 1 -e > {output[0]}"
+
+rule get_polydfe_bestfit:
+    input:
+        output_dir + "/polyDFE/{seeds}/{chrms}/pop{ids}/pop{ids}.polyDFE.results"
+    output:
+        output_dir + "/polyDFE/{seeds}/{chrms}/pop{ids}/pop{ids}.polyDFE.bestfit"
+    threads: 1
+    resources: time_min=60, mem_mb=5000, cpus=1
+    shell:
+        """
+        paste <(grep "Best joint likelihood" {output_dir}/polyDFE/{wildcards.seeds}/{wildcards.chrms}/pop{wildcards.ids}/pop{wildcards.ids}.polyDFE.results | awk '{{print $6}}') \
+              <(grep eps_an {output_dir}/polyDFE/{wildcards.seeds}/{wildcards.chrms}/pop{wildcards.ids}/pop{wildcards.ids}.polyDFE.results -A 3 | tail -1 | awk 'BEGIN{{OFS="\t"}}{{print $2,$3}}') \
+              <(grep eps_an {output_dir}/polyDFE/{wildcards.seeds}/{wildcards.chrms}/pop{wildcards.ids}/pop{wildcards.ids}.polyDFE.results -A 1 | tail -1 | awk '{{print $3}}') > {output}
+        """
+
+rule combine_polydfe_bestfits:
+    input:
+        pop0_res = expand(output_dir + "/polyDFE/{seeds}/{chrms}/pop0/pop0.polyDFE.bestfit", seeds=seed_array, chrms=chrm_list),
+        pop1_res = expand(output_dir + "/polyDFE/{seeds}/{chrms}/pop1/pop1.polyDFE.bestfit", seeds=seed_array, chrms=chrm_list),
+        pop2_res = expand(output_dir + "/polyDFE/{seeds}/{chrms}/pop2/pop2.polyDFE.bestfit", seeds=seed_array, chrms=chrm_list)
+    output:
+        expand(output_dir + "/polyDFE/{chrms}/pop{ids}.polyDFE.bestfits", chrms=chrm_list, ids=[0, 1, 2])
+    threads: 1
+    shell:
+        """
+        cat {input.pop0_res} | sed '1i#likelihood\tS_d\tb\ttheta_bar' > {output[0]}
+        cat {input.pop1_res} | sed '1i#likelihood\tS_d\tb\ttheta_bar' > {output[1]}
+        cat {input.pop2_res} | sed '1i#likelihood\tS_d\tb\ttheta_bar' > {output[2]}
+        """
+
+#rule plot_polydfe_results
+
+# ###############################################################################
+# DFE-alpha
+# ###############################################################################
+
+rule run_dfe_alpha:
+    input:
+        output_dir + "/dfe-alpha/{seeds}/{chrms}/pop{ids}/pop{ids}.dfe-alpha.neu.config",
+        output_dir + "/dfe-alpha/{seeds}/{chrms}/pop{ids}/pop{ids}.dfe-alpha.nonneu.config",
+        output_dir + "/dfe-alpha/{seeds}/{chrms}/pop{ids}/pop{ids}.dfe-alpha.fs"
+    output:
+        output_dir + "/dfe-alpha/{seeds}/{chrms}/pop{ids}/nonneu/est_dfe.out"
+    threads: 1
+    resources: time_min=60, mem_mb=5000, cpus=1
+    shell:
+        "est_dfe -c {input[0]}; est_dfe -c {input[1]}"
+
+#rule plot_dfe_alpha_results
+
+# ###############################################################################
+# anavar
+# ###############################################################################
+
+#rule run_anavar:
+#    input:
+#        "results/anavar/pop0.anavar.ctl.txt"
+#    output:
+#        "results/anavar/pop0.anavar.results",
+#        "results/anavar/pop0.anavar.log"
+#    threads: 1
+#    shell:
+#        "anavar {input[0]} {output[0]} {output[1]}"
+
+
+# ###############################################################################
+# prfreq
+# ###############################################################################
+
+#rule run_prfreq:
+#    input:
+#    output:
+#    threads: 1
+#    shell:
+
+
+# ###############################################################################
+# plots
+# ###############################################################################
+
+rule plot_results:
+    input:
+        dadi_res = expand(output_dir + "/dadi/{chrms}/pop{ids}.dadi.dfe.bestfits", chrms=chrm_list, ids=[0, 1, 2]),
+        polydfe_res = expand(output_dir + "/polyDFE/{chrms}/pop{ids}.polyDFE.bestfits", chrms=chrm_list, ids=[0, 1, 2])
+    output:
+        "plots/{chrms}/dfe.inference.benchmark.pdf"
+    threads: 1
+    resources: time_min=60, mem_mb=5000, cpus=1
+    run:
+        import matplotlib.pyplot as plt
+        import pandas as pd
+        import matplotlib
+        matplotlib.use("Agg")
+
+        mu = model.mutation_rate
+        contig = species.get_contig(wildcards.chrms)
+        seq_len = contig.recombination_map.sequence_length
+
+        dadi_pop0 = pd.read_csv(input.dadi_res[0], sep="\t")
+        dadi_pop1 = pd.read_csv(input.dadi_res[1], sep="\t")
+        dadi_pop2 = pd.read_csv(input.dadi_res[2], sep="\t")
+        polydfe_pop0 = pd.read_csv(input.polydfe_res[0], sep="\t")
+        polydfe_pop1 = pd.read_csv(input.polydfe_res[1], sep="\t")
+        polydfe_pop2 = pd.read_csv(input.polydfe_res[2], sep="\t")
+        dadi_pop0_Nes = dadi_pop0['theta']/(4*mu*seq_len*0.7)
+        dadi_pop1_Nes = dadi_pop1['theta']/(4*mu*seq_len*0.7)
+        dadi_pop2_Nes = dadi_pop2['theta']/(4*mu*seq_len*0.7)
+        dadi_pop0_Es = dadi_pop0['shape']*dadi_pop0['scale']/(2*dadi_pop0_Nes)
+        dadi_pop1_Es = dadi_pop1['shape']*dadi_pop1['scale']/(2*dadi_pop1_Nes)
+        dadi_pop2_Es = dadi_pop2['shape']*dadi_pop2['scale']/(2*dadi_pop2_Nes)
+
+        ## theta_bar = 4*Ne*mu
+        ## S_d = 4*Ne*E(s)
+        ## E(s) = mu*S_d/theta_bar
+        ## See Fig. 1 in doi: 10.1534/genetics.117.300323
+        polydfe_pop0_Es = abs(mu*polydfe_pop0['S_d']/polydfe_pop0['theta_bar'])
+        polydfe_pop1_Es = abs(mu*polydfe_pop1['S_d']/polydfe_pop1['theta_bar'])
+        polydfe_pop2_Es = abs(mu*polydfe_pop2['S_d']/polydfe_pop2['theta_bar'])
+
+        fig = plt.figure(figsize=(6,6), dpi=300)
+
+        plt.subplot(2,2,1)
+        plt.ylabel('Shape parameter')
+        plt.xlabel('Population')
+        plt.boxplot([dadi_pop0['shape'], dadi_pop1['shape'], dadi_pop2['shape']])
+        plt.plot(plt.xlim(), [0.19,0.19], c='red')
+        plt.xticks([1,2,3],['YRI','CEU','CHB'])
+        plt.ylim([0.1,0.25])
+        plt.title('dadi')
+
+        plt.subplot(2,2,2)
+        plt.ylabel('|E(s)|')
+        plt.xlabel('Population')
+        plt.boxplot([dadi_pop0_Es, dadi_pop1_Es, dadi_pop2_Es])
+        plt.plot(plt.xlim(), [0.014,0.014], c='red')
+        plt.xticks([1,2,3],['YRI','CEU','CHB'])
+        #plt.ylim([0,0.04])
+        plt.title('dadi')
+
+        plt.subplot(2,2,3)
+        plt.ylabel('Shape parameter')
+        plt.xlabel('Population')
+        plt.boxplot([polydfe_pop0['b'], polydfe_pop1['b'], polydfe_pop2['b']])
+        plt.plot(plt.xlim(), [0.19,0.19], c='red')
+        plt.xticks([1,2,3],['YRI','CEU','CHB'])
+        plt.ylim([0.1,0.25])
+        plt.title('polyDFE')
+
+        plt.subplot(2,2,4)
+        plt.ylabel('|E(s)|')
+        plt.xlabel('Population')
+        plt.boxplot([polydfe_pop0_Es, polydfe_pop1_Es, polydfe_pop2_Es])
+        plt.plot(plt.xlim(), [0.014,0.014], c='red')
+        plt.xticks([1,2,3],['YRI','CEU','CHB'])
+        #plt.ylim([0,0.04])
+        plt.title('polyDFE')
+
+        fig.tight_layout()
+        plt.savefig(output[0])

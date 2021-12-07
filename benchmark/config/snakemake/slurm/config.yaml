@@ -1,0 +1,2 @@
+jobs: 100
+cluster: "sbatch -A rgutenk -p standard -t {resources.time_min} --mem-per-cpu={resources.mem_mb} -c {resources.cpus} -o logs_slurm/{rule}_{wildcards} -e logs_slurm/{rule}_{wildcards} --mail-type=FAIL --export=ALL,LD_LIBRARY_PATH=/xdisk/rgutenk/xinhuang/software/gsl-2.7/build/lib/"

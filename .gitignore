@@ -1,3 +1,5 @@
 *.gz
 intervals/
 __pycache__
+benchmark/.snakemake/*
+benchmark/logs_slurm/*

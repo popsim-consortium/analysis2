@@ -34,6 +34,7 @@ def KimDFE():
 species = stdpopsim.get_species("HomSap")
 model = species.get_demographic_model("OutOfAfrica_3G09")
 contig = species.get_contig("22")
+contig.clear_genomic_mutation_types()
 samples = model.get_samples(100, 100, 100)  # YRI, CEU, CHB
 
 intervals = np.loadtxt("intervals/HomSap/ensembl_havana_exons_22.txt", dtype=int)
