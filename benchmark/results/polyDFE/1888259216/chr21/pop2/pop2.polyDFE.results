@@ -1,0 +1,73 @@
+---- Running command
+---- ./polyDFE -d /xdisk/rgutenk/xinhuang/projects/stdpopsim2/analysis2/benchmark/results/polyDFE/1888259216/chr21/pop2/pop2.polyDFE.fs -m C -i config/polyDFE/polyDFE_init_models.txt 1 -e 
+---- Performing inference using model C
+
+---- Performing inference on /xdisk/rgutenk/xinhuang/projects/stdpopsim2/analysis2/benchmark/results/polyDFE/1888259216/chr21/pop2/pop2.polyDFE.fs
+----      with -i config/polyDFE/polyDFE_init_models.txt 1
+---- Data /xdisk/rgutenk/xinhuang/projects/stdpopsim2/analysis2/benchmark/results/polyDFE/1888259216/chr21/pop2/pop2.polyDFE.fs does not contain divergence counts. Using option -w.
+---- No mutation variability. Using Poisson likelihood.
+
+
+---- Calculating initial values
+
+-- Starting local optimization
+-- Optimizing all parameters
+  it     theta_bar           S_d             b           r 2           r 3           r 4           r 5           r 6           r 7           r 8           r 9          r 10          r 11          r 12          r 13          r 14          r 15          r 16          r 17          r 18          r 19           ln lk          grad status 
+   0 0.00032819536        -20000         0.208 0.53402913676 0.48662752772 0.50880626223 0.57077625570 0.60795825179 0.59360730593 0.64013916068 0.63600782778 0.66318764948 0.66492715807 0.80887149380 0.72080887149 0.92237442922 0.85779517286 0.86975429441 0.89823874755 1.25636007827             1 -2943.267689865 105.503197921   -2 
+ 229 0.00033115569 -1589.3067800 0.15204070559 0.52705016509 0.45268395226 0.48344526825 0.53617641343 0.62968108133 0.61126337571 0.62800950217 0.60459439271 0.62568863147 0.66767356071 0.80607748089 0.74869041042 0.92050600571 0.87209542876 0.90176812004 0.91183176379 1.23633363089 1.45914618731 -159.6729296075 0.00077372362   -3 
+-- Local optimization: stuck in the same solution
+---- Best joint likelihood found -159.672929607578226 with gradient 0.00077
+
+---- Results for /xdisk/rgutenk/xinhuang/projects/stdpopsim2/analysis2/benchmark/results/polyDFE/1888259216/chr21/pop2/pop2.polyDFE.fs 
+--  Model: C
+--        eps_an     theta_bar             a 
+--             0 0.00033115569            -1 
+--           S_d             b           p_b           S_b 
+-- -1589.3067800 0.15204070559             0             0 
+--           r 2           r 3           r 4           r 5           r 6           r 7           r 8           r 9          r 10          r 11          r 12          r 13          r 14          r 15          r 16          r 17          r 18          r 19 
+-- 0.52705016509 0.45268395226 0.48344526825 0.53617641343 0.62968108133 0.61126337571 0.62800950217 0.60459439271 0.62568863147 0.66767356071 0.80607748089 0.74869041042 0.92050600571 0.87209542876 0.90176812004 0.91183176379 1.23633363089 1.45914618731 
+
+---- Expected P_neut(i), 0 < i < n (neutral SFS per site) 
+E[P_neut(1)] = 0.0003311557
+E[P_neut(2)] = 0.0000872678
+E[P_neut(3)] = 0.0000499696
+E[P_neut(4)] = 0.0000400239
+E[P_neut(5)] = 0.0000355116
+E[P_neut(6)] = 0.0000347537
+E[P_neut(7)] = 0.0000289176
+E[P_neut(8)] = 0.0000259961
+E[P_neut(9)] = 0.0000222461
+E[P_neut(10)] = 0.0000207200
+E[P_neut(11)] = 0.0000201004
+E[P_neut(12)] = 0.0000222448
+E[P_neut(13)] = 0.0000190718
+E[P_neut(14)] = 0.0000217736
+E[P_neut(15)] = 0.0000192533
+E[P_neut(16)] = 0.0000186641
+E[P_neut(17)] = 0.0000177623
+E[P_neut(18)] = 0.0000227455
+E[P_neut(19)] = 0.0000254318
+
+---- Expected P_sel(i), 0 < i < n (selected SFS per site) 
+E[P_sel(1)] = 0.0001441896
+E[P_sel(2)] = 0.0000326673
+E[P_sel(3)] = 0.0000174260
+E[P_sel(4)] = 0.0000133390
+E[P_sel(5)] = 0.0000114499
+E[P_sel(6)] = 0.0000109184
+E[P_sel(7)] = 0.0000088931
+E[P_sel(8)] = 0.0000078514
+E[P_sel(9)] = 0.0000066142
+E[P_sel(10)] = 0.0000060756
+E[P_sel(11)] = 0.0000058212
+E[P_sel(12)] = 0.0000063702
+E[P_sel(13)] = 0.0000054057
+E[P_sel(14)] = 0.0000061133
+E[P_sel(15)] = 0.0000053585
+E[P_sel(16)] = 0.0000051522
+E[P_sel(17)] = 0.0000048658
+E[P_sel(18)] = 0.0000061861
+E[P_sel(19)] = 0.0000068697
+
+---- alpha_dfe = 0.000000
+
