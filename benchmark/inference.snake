@@ -6,7 +6,7 @@ import os
 import numpy as np
 import stdpopsim
 import tskit
-import dadi
+import ts2fs
 import plots
 
 configfile: "config/snakemake/config.yaml"
@@ -52,25 +52,14 @@ poly_dfe_exec = config["poly_dfe_exec"]
 # Select DFE model from catalog                                                                                                                   
 h17_dfe = species.get_dfe("Gamma_H17")
 
-## Run only the simulations!
-#rule all:
-#    input: expand(output_dir + "/simulated_data/{seeds}/sim_OutOfAfrica_3G09_HuberDFE_{chrms}.trees", seeds=seed_array, chrms=chrm_list) 
-
+# Run simulation only
 rule all:
-    input: 
-        #expand(output_dir + "/dadi/{seeds}/{chrms}/pop{ids}/pop{ids}.neu.fs", seeds=seed_array, chrms=chrm_list, ids=[0, 1, 2]),
-        #expand(output_dir + "/dadi/{seeds}/{chrms}/pop{ids}/pop{ids}.nonneu.fs", seeds=seed_array, chrms=chrm_list, ids=[0, 1, 2]),
-        #expand(output_dir + "/polyDFE/{seeds}/{chrms}/pop{ids}/pop{ids}.polyDFE.results", seeds=seed_array, chrms=chrm_list, ids=[0, 1, 2]),
-        #expand(output_dir + "/dfe-alpha/{seeds}/{chrms}/pop{ids}/pop{ids}.dfe-alpha.neu.config", seeds=seed_array, chrms=chrm_list, ids=[0, 1, 2]),
-        #expand(output_dir + "/dfe-alpha/{seeds}/{chrms}/pop{ids}/pop{ids}.dfe-alpha.nonneu.config", seeds=seed_array, chrms=chrm_list, ids=[0, 1, 2]),
-        #expand(output_dir + "/dfe-alpha/{seeds}/{chrms}/pop{ids}/pop{ids}.dfe-alpha.fs", seeds=seed_array, chrms=chrm_list, ids=[0, 1, 2]),
-        #expand(output_dir + "/dfe-alpha/{seeds}/{chrms}/pop{ids}/nonneu/est_dfe.out", seeds=seed_array, chrms=chrm_list, ids=[0, 1, 2]),
-        #expand(output_dir + "/dadi/{seeds}/{chrms}/pop{ids}/pop{ids}.two_epoch.InferDM.opts.0", seeds=seed_array, chrms=chrm_list, ids=[0, 1, 2])
-        #expand(output_dir + "/dadi/{seeds}/{chrms}/pop{ids}/pop{ids}.two_epoch.gamma.InferDFE.bestfits", seeds=seed_array, chrms=chrm_list, ids=[0, 1, 2])
-        #expand(output_dir + "/polyDFE/{seeds}/{chrms}/pop{ids}/pop{ids}.polyDFE.bestfit", seeds=seed_array, chrms=chrm_list, ids=[0, 1, 2])
-        #expand(output_dir + "/dadi/pop{ids}.dadi.dfe.bestfits", ids=[0, 1, 2]),
-        #expand(output_dir + "/polyDFE/pop{ids}.polyDFE.bestfits", ids=[0, 1, 2])
-        expand("plots/{chrms}/dfe.inference.benchmark.pdf", chrms=chrm_list)
+    input:
+        expand(output_dir + "/simulated_data/{seeds}/sim_OutOfAfrica_3G09_HuberDFE_{chrms}.trees", seeds=seed_array, chrms=chrm_list)
+
+#rule all:
+#    input: 
+#        expand("plots/{chrms}/dfe.inference.benchmark.pdf", chrms=chrm_list)
 
 #rule all:
 #    input:
@@ -95,7 +84,7 @@ rule simulation:
             intervals=np.array([[0, int(contig.recombination_map.sequence_length)]]),
             DFE=h17_dfe
         )
-        contig.mutation_rate = 2.35e-8
+        contig.mutation_rate = 2.35e-8 / 0.7
         engine = stdpopsim.get_engine("slim")
         ts = engine.simulate(
             model,
@@ -106,36 +95,6 @@ rule simulation:
             seed=wildcards.seeds,
         )
         ts.dump(output[0])
-
-def generate_fs_from_ts(ts, sample_sets=None):
-
-    def allele_counts(ts, sample_sets=None):
-        if sample_sets is None:
-            sample_sets = [ts.samples()]
-        def f(x):
-            return x
-        return ts.sample_count_stat(sample_sets, f, len(sample_sets),
-                                    span_normalise=False, windows='sites',
-                                    polarised=True, mode='site', strict=False)
-
-    mut_type = np.zeros(ts.num_sites)
-    for j, s in enumerate(ts.sites()):
-        mt = []
-        for m in s.mutations:
-            for md in m.metadata["mutation_list"]:
-                mt.append(md["mutation_type"])
-        if len(set(mt)) > 1:
-            mut_type[j] = 3
-        else:
-            mut_type[j] = mt[0]
-
-    freqs = allele_counts(ts, [sample_sets])
-    freqs = freqs.flatten().astype(int)
-    mut_afs = np.zeros((len(sample_sets)+1, 3), dtype='int64')
-    for k in range(3):
-        mut_afs[:, k] = np.bincount(freqs[mut_type == k+1], minlength=len(sample_sets) + 1)
-
-    return mut_afs
 
 #rule generate_fs:
 #    input:
@@ -271,27 +230,26 @@ dfe_ubounds = '1 50000'
 
 rule generate_dadi_fs:
     input:
-        output_dir + "/simulated_data/{seeds}/sim_OutOfAfrica_3G09_HuberDFE_{chrms}.trees"
+        #output_dir + "/simulated_data/{seeds}/sim_OutOfAfrica_3G09_HuberDFE_{chrms}.trees"
+        rules.simulation.output
     output:
         output_dir + "/dadi/{seeds}/{chrms}/pop{ids}/pop{ids}.neu.fs",
         output_dir + "/dadi/{seeds}/{chrms}/pop{ids}/pop{ids}.nonneu.fs"
     threads: 1
-    resources: time_min=60, mem_mb=5000, cpus=8
+    resources: time_min=60, mem_mb=5000, cpus=1
     run:
         contig = species.get_contig(wildcards.chrms)
         seq_len = contig.recombination_map.sequence_length
+        neu_prop = 0.3
+        nonneu_prop = 0.7
 
         ts = tskit.load(input[0])
         index = int(wildcards.ids)
         sizes = np.cumsum(num_samples_per_population)
         if index != 0: samps = ts.samples()[sizes[index-1]:sizes[index]]
         else: samps = ts.samples()[:sizes[index]]
-        mut_afs = generate_fs_from_ts(ts, samps)
 
-        nonneu_fs = dadi.Spectrum(mut_afs[:,0])
-        neu_fs = dadi.Spectrum(mut_afs[:,1])
-        neu_fs.to_file(output[0])
-        nonneu_fs.to_file(output[1])
+        ts2fs.generate_fs(ts, samps, seq_len, neu_prop, nonneu_prop, output, format='dadi')
 
 rule dadi_infer_dm:
     input: 
@@ -305,7 +263,8 @@ rule dadi_infer_dm:
 
 rule dadi_bestfit_dm:
     input: 
-        output_dir + "/dadi/{seeds}/{chrms}/pop{ids}/pop{ids}.two_epoch.InferDM.opts.0"
+        #output_dir + "/dadi/{seeds}/{chrms}/pop{ids}/pop{ids}.two_epoch.InferDM.opts.0"
+        rules.dadi_infer_dm.output
     output:
         output_dir + "/dadi/{seeds}/{chrms}/pop{ids}/pop{ids}.two_epoch.InferDM.bestfits"
     threads: 1
@@ -315,7 +274,8 @@ rule dadi_bestfit_dm:
 
 rule dadi_generate_cache:
     input:
-        output_dir + "/dadi/{seeds}/{chrms}/pop{ids}/pop{ids}.two_epoch.InferDM.bestfits"
+        #output_dir + "/dadi/{seeds}/{chrms}/pop{ids}/pop{ids}.two_epoch.InferDM.bestfits"
+        rules.dadi_bestfit_dm.output
     output:
         output_dir + "/dadi/{seeds}/{chrms}/pop{ids}/pop{ids}.two_epoch.spectra.bpkl"
     threads: 8
@@ -335,11 +295,12 @@ rule dadi_infer_dfe:
     threads: 8
     resources: time_min=60, mem_mb=5000, cpus=8
     shell:
-        "dadi-cli InferDFE --fs {input[0]} --cache1d {input[1]} --demo-popt {input[2]} --output-prefix {output_dir}/dadi/{wildcards.seeds}/{wildcards.chrms}/pop{wildcards.ids}/pop{wildcards.ids}.two_epoch.gamma --pdf1d {dfe_model} --p0 {dfe_p0} --ubounds {dfe_ubounds} --lbounds {dfe_lbounds} --ratio 2.31 --optimizations 500 --threads {threads}"
+        "dadi-cli InferDFE --fs {input[0]} --cache1d {input[1]} --demo-popt {input[2]} --output-prefix {output_dir}/dadi/{wildcards.seeds}/{wildcards.chrms}/pop{wildcards.ids}/pop{wildcards.ids}.two_epoch.gamma --pdf1d {dfe_model} --p0 {dfe_p0} --ubounds {dfe_ubounds} --lbounds {dfe_lbounds} --ratio 2.31 --optimizations 1000 --threads {threads}"
 
 rule dadi_bestfit_dfe:
     input:
-        output_dir + "/dadi/{seeds}/{chrms}/pop{ids}/pop{ids}.two_epoch.gamma.InferDFE.opts.0"
+        #output_dir + "/dadi/{seeds}/{chrms}/pop{ids}/pop{ids}.two_epoch.gamma.InferDFE.opts.0"
+        rules.dadi_infer_dfe.output
     output:
         output_dir + "/dadi/{seeds}/{chrms}/pop{ids}/pop{ids}.two_epoch.gamma.InferDFE.bestfits"
     threads: 1
@@ -367,21 +328,14 @@ rule combine_dadi_dfe_bestfits:
         rm temp1
         """
 
-#rule dadi_plot_results:
-#    input: rules.dadi_bestfit_dfe.output
-#    output:
-#        "results/dadi/pop0.two_epoch_1d.gamma.mut.prop.pdf"
-#    threads: 1
-#    shell:
-#        "dadi-cli Plot --dfe-popt {input} --pdf1d gamma --output {output} --mut-rate 2.35e-8 --seq-len 248956 --ratio 2.31"
-
 # ###############################################################################
 # polyDFE
 # ###############################################################################
 
 rule generate_polydfe_fs:
     input:
-        output_dir + "/simulated_data/{seeds}/sim_OutOfAfrica_3G09_HuberDFE_{chrms}.trees"
+        #output_dir + "/simulated_data/{seeds}/sim_OutOfAfrica_3G09_HuberDFE_{chrms}.trees"
+        rules.simulation.output
     output:
         output_dir + "/polyDFE/{seeds}/{chrms}/pop{ids}/pop{ids}.polyDFE.fs"
     threads: 1
@@ -389,27 +343,21 @@ rule generate_polydfe_fs:
     run:
         contig = species.get_contig(wildcards.chrms)
         seq_len = contig.recombination_map.sequence_length
+        neu_prop = 0.3
+        nonneu_prop = 0.7
 
         ts = tskit.load(input[0])
         index = int(wildcards.ids)
         sizes = np.cumsum(num_samples_per_population)
         if index != 0: samps = ts.samples()[sizes[index-1]:sizes[index-1]+20]
         else: samps = ts.samples()[:20]
-        mut_afs = generate_fs_from_ts(ts, samps)
 
-        neu_fs = mut_afs[:,1]
-        nonneu_fs = mut_afs[:,0]
-
-        neu_len = round(seq_len * 0.3)
-        nonneu_len = round(seq_len * 0.7)
-        with open(output[0], 'w') as o:
-            o.write("1 1 20\n")
-            o.write(" ".join([str(round(f)) for f in neu_fs[1:-1]]) + " " + str(neu_len) + "\n")
-            o.write(" ".join([str(round(f)) for f in nonneu_fs[1:-1]]) + " " + str(nonneu_len) + "\n")
+        ts2fs.generate_fs(ts, samps, seq_len, neu_prop, nonneu_prop, output, format='polydfe')
 
 rule run_polydfe:
     input: 
-        output_dir + "/polyDFE/{seeds}/{chrms}/pop{ids}/pop{ids}.polyDFE.fs"
+        #output_dir + "/polyDFE/{seeds}/{chrms}/pop{ids}/pop{ids}.polyDFE.fs"
+        rules.generate_polydfe_fs.output
     output: 
         output_dir + "/polyDFE/{seeds}/{chrms}/pop{ids}/pop{ids}.polyDFE.results"
     threads: 1
@@ -419,7 +367,8 @@ rule run_polydfe:
 
 rule get_polydfe_bestfit:
     input:
-        output_dir + "/polyDFE/{seeds}/{chrms}/pop{ids}/pop{ids}.polyDFE.results"
+        #output_dir + "/polyDFE/{seeds}/{chrms}/pop{ids}/pop{ids}.polyDFE.results"
+        rules.run_polydfe.output
     output:
         output_dir + "/polyDFE/{seeds}/{chrms}/pop{ids}/pop{ids}.polyDFE.bestfit"
     threads: 1
@@ -439,6 +388,7 @@ rule combine_polydfe_bestfits:
     output:
         expand(output_dir + "/polyDFE/{chrms}/pop{ids}.polyDFE.bestfits", chrms=chrm_list, ids=[0, 1, 2])
     threads: 1
+    resources: time_min=60, mem_mb=5000, cpus=1
     shell:
         """
         cat {input.pop0_res} | sed '1i#likelihood\tS_d\tb\ttheta_bar' > {output[0]}

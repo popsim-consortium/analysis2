@@ -1,4 +1,13 @@
-Simulating selelection with stdpopsim
+# Installing the requirements
+
+```
+conda create --name stdpopsim-analysis2 python=3.8
+conda activate stdpopsim-analysis2
+conda install -c conda-forge --file conda-requirements.txt
+pip install -r requirements.txt
+```
+
+#Simulating selelection with stdpopsim
 
 For each HomSap chromosome one can simulate selection in specific regions (e.g. coding region)
 by using the function in stdpopsim and passed to
