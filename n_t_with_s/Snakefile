@@ -181,8 +181,7 @@ rule simulation:
             # if selection is not specified then a neutral model is expected
             contig = species.get_contig(wildcards.chrms, genetic_map=genetic_map_id)
 
-        ###### CHANGE SLIM SCALING FACTOR !!!!!!!!!!
-        ts = engine.simulate(model, contig, samples, seed=wildcards.seeds, slim_scaling_factor=10,
+        ts = engine.simulate(model, contig, samples, seed=wildcards.seeds, slim_scaling_factor=1,
             slim_burn_in=10)
         ts.dump(output[0])
 

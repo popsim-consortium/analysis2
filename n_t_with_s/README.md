@@ -5,17 +5,17 @@ demographic inference using multiple programs, with
 identical resulting data from any demographic model 
 found in `stdpopsim` as input to each. 
 This provides an example of how standardized 
-population simulations may be used to compare methods.
+population simulations may be used to compare methods
+softwares and selection assumptions.
 
 The present analyses tests how demographic inference 
-is influenced by selection.
+is influenced by selection (e.g, linked selection).  
 
 The Snakemake workflow includes the necessary pipeline
 for simulation, analyses, and plotting in an efficient manner.
 Simply choose your parameters in a config file, 
 and let snakemake handle the rest. 
 (For large runs, the use of a cluster is highly encouraged)
-
 
 ## Workflow
 
@@ -42,14 +42,16 @@ might look like this:
     "population_id" : 0,
     "num_samples_per_population" : [20, 0, 0],
     "num_sampled_genomes_msmc" : "2,8",
+    "num_sampled_genomes_per_replicate": "2,8",
     "num_msmc_iterations" : 20,
-    "replicates" : 10,
+    "replicates" : 1, 
     "species" : "HomSap",
-    "model" : "OutOfAfrica_3G09",
-    "genetic_map" : "HapmapII_GRCh37",
-    "chrm_list" : "chr22,chrX",
+    "model" : "OutOfAfricaArchaicAdmixture_5R19",
+    "genetic_map" : "HapMapII_GRCh37",
+    "chrm_list" : "chr22",
     "mask_file" : "masks/HapmapII_GRCh37.mask.bed",
-    "dfe_id": "Gamma_K17"
+    "dfe_id": "Gamma_K17",
+    "selection":"all", 
     "annotation_id": "ensembl_havana_104_exons"
 }
 ```
@@ -64,7 +66,7 @@ where `-j` is the number cores available to run jobs in parallel, and
 `--config` points to the _directory_ that contains the config file.
 
 ### Cluster environments
-Our workflow can also be run on a cluster. To do so requires
+Our workflow can also be run on a cluster. To do so, it requires
 the setup of a `.json` configuration file that lets `snakemake`
 know about your cluster. We have provided an example of 
 such a file in `cluster_talapas.json` that is for use with a
@@ -102,7 +104,8 @@ and jobs will be automatically farmed out to the cluster
 
 ### Final output
 The current final output is a plot comparing stairwayplot and smc++ estimates of $N(t)$, i.e., 
-`homo_sapiens_Gutenkunst/all_estimated_Ne.png`  
+`homo_sapiens_Gutenkunst/all_estimated_Ne_{selection}.png` , 
+with selection being 'none', 'all' or applied to the 'exons'.
 
 
 ## Parameter Description
@@ -156,3 +159,12 @@ Set to "all" to simulate all chromosomes for the genome.
 `mask_file` : `<class 'str'>` A string indicating the path to a bed formatted file with
 to be masked out of the analysis.
 
+`dfe_id`: `<class 'str'>` A string indicating what Distribution of Fitness Effects to use.
+See http://sesame.uoregon.edu/~adkern/stdpopsim/doc/catalog.html to check all the possible DFEs
+
+`selection`: `<class 'str'>` A string indicating where the DFE should be applied. So far three
+options are allowed: 'exons', where selection is imposed on exons, 'none', and 'all' –– in which 
+selection is insert in the entire contig under subject. 
+
+`annotation_id`:  `<class 'str'>` A string indicating the annotation file to be used. For humans,
+the two annotations available are: ensembl_havana_104_exons and ensembl_havana_104_CDS.
