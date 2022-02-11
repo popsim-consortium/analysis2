@@ -23,7 +23,7 @@ def _generate_fs_from_ts(ts, sample_sets=None):
     for j, s in enumerate(ts.sites()):
         mt = []
         for m in s.mutations:
-            print(m)
+            # print(m)
             for md in m.metadata["mutation_list"]:
                 mt.append(md["mutation_type"])
         if len(set(mt)) > 1:
@@ -154,20 +154,3 @@ def _generate_anavar_fs(ts, sample_sets, output):
         #        o.write(f"{d}\n")
 
     pass
-
-if __name__ == '__main__':
-    import stdpopsim
-    import tskit
-    species = stdpopsim.get_species("HomSap")
-    contig = species.get_contig('chr21')
-    seq_len = contig.recombination_map.sequence_length
-    neu_prop = 0.3
-    nonneu_prop = 0.7
-    seq_len = contig.recombination_map.sequence_length
-    ts = tskit.load("/xdisk/rgutenk/xinhuang/projects/stdpopsim2/analysis2_dev/benchmark/results/simulated_data/878579711/sim_OutOfAfrica_3G09_HuberDFE_chr21.trees")
-    samps = ts.samples()[:20]
-    generate_fs(ts, samps, seq_len, neu_prop, nonneu_prop, 't', format='polydfe')
-
-    #ts = tskit.load("results/simulated_data/OutOfAfrica_3G09/878579711/sim_OutOfAfrica_3G09_HuberDFE_chr21.trees")
-    #samps = ts.samples()[:20]
-    #generate_fs(ts, samps, seq_len, neu_prop, nonneu_prop, 's', format='polydfe')
