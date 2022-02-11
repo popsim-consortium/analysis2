@@ -6,7 +6,7 @@ import os
 import numpy as np
 import stdpopsim
 
-configfile: "./config/snakemake/config.yaml"
+configfile: "config/snakemake/config.yaml"
 
 np.random.seed(config["seed"])
 
