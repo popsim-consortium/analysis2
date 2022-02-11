@@ -16,7 +16,6 @@ np.random.seed(config["seed"])
 
 # The number of replicates of each analysis you would like to run
 replicates = config["replicates"]
-
 # Where you would like all output files from analysis to live
 output_dir = os.path.abspath(config["output_dir"])
 
@@ -40,12 +39,9 @@ if(config["chrm_list"] != "all"):
 seed_array = np.random.random_integers(1,2**31,replicates)
 
 # The specific demographic model you would like to run
-
-demo_model_array = config["demo_models"]
-#model = species.get_demographic_model(config["model"])
-
-# Select DFE model from catalog                                                                                                                   
-h17_dfe = species.get_dfe("Gamma_H17")
+demo_model_array =  config["demo_models"]
+# Select DFE model from catalog  
+dfe_list = config["dfe_list"]
 
 # ###############################################################################
 # GENERAL RULES & GLOBALS
@@ -53,29 +49,30 @@ h17_dfe = species.get_dfe("Gamma_H17")
 
 rule all:
     input:
-        expand(output_dir + "/simulated_data/{demo_models}/{seeds}/sim_{demo_models}_HuberDFE_{chrms}.trees", seeds=seed_array, chrms=chrm_list, demo_models=demo_model_array)
+        expand(output_dir + "/simulated_data/{seeds}/{demog}/{dfes}/sim_{chrms}.trees", seeds=seed_array, demog=demo_model_array, dfes=dfe_list, chrms=chrm_list)
 
 rule simulation:
     input:
     output:
-        output_dir + "/simulated_data/{demo_models}/{seeds}/sim_{demo_models}_HuberDFE_{chrms}.trees"
+        output_dir + "/simulated_data/{seeds}/{demog}/{dfes}/sim_{chrms}.trees"
     threads: 1
     resources: time_min=3000, mem_mb=10000, cpus=1
     run:
-        if wildcards.demo_models == 'Constant': 
+        if wildcards.demog == 'Constant': 
             model = stdpopsim.PiecewiseConstantSize(species.population_size)
             mutation_rate = 1.29e-08
             samples = model.get_samples(100)
         else: 
-            model = species.get_demographic_model(wildcards.demo_models)
+            model = species.get_demographic_model(wildcards.demog)
             mutation_rate = model.mutation_rate
             samples = model.get_samples(*num_samples_per_population)  # YRI, CEU, CHB
 
         contig = species.get_contig(wildcards.chrms)
         contig.clear_dfes()
+        dfe = species.get_dfe(wildcards.dfes)
         contig.add_dfe(
             intervals=np.array([[0, int(contig.recombination_map.sequence_length)]]),
-            DFE=h17_dfe
+            DFE=dfe,
         )
         contig.mutation_rate = mutation_rate
         engine = stdpopsim.get_engine("slim")
@@ -83,7 +80,7 @@ rule simulation:
             model,
             contig,
             samples,
-            slim_scaling_factor=1,
+            slim_scaling_factor=10,
             slim_burn_in=10,
             seed=wildcards.seeds,
         )
