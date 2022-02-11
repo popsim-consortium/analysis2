@@ -55,9 +55,6 @@ num_sampled_genomes_per_replicate = config["num_sampled_genomes_per_replicate"]
 # For now leaving it a 1 just to get results quickly
 replicates = config["replicates"]
 
-# Define where selection will be imposed (whole genome or exons)
-selection_list = [sel for sel in config["selection"].split(",")]
-selection = selection_list[0]
 
 # Where you would like all output files from analysis to live
 output_dir = os.path.abspath(config["config"])
@@ -81,11 +78,12 @@ genetic_map_id = config.get("genetic_map", None)
 
 # The DFE id used for selection analyses
 dfe_id = config.get("dfe_id", None)
-# The GFF annotation id
-annotation_id = config.get("annotation_id", None)
+
+# The GFF annotation id defining where selection will be simulated
+annotation_id, selection = config.get("annotation_id", None).split(",")
 
 # The names of all chromosomes to simulate, separated by commas
-# Use "all" to simulate all chromsomes for the genome
+# Use "all" to simulate all chromosomes for the genome
 chrm_list = [chrom.id for chrom in species.genome.chromosomes]
 if "chrY" in chrm_list:
     chrm_list.remove("chrY")
@@ -162,26 +160,25 @@ rule simulation:
         contig = species.get_contig(wildcards.chrms, genetic_map=genetic_map_id)
         samples = model.get_samples(*num_samples_per_population)
         engine = stdpopsim.get_engine("slim") ## here we use the slim engine
-        ####### Here we are adding a given DFE
-        ####### Adding DFE/selection to the simulation  
+
+        # Adding DFE/selection to the simulation  
         dfe = species.get_dfe(dfe_id)
-        selection = wildcards.selection
 
-        if selection == "exons":
-            ## Adding annotation only seletion on exon region
-            exons = species.get_annotations(annotation_id)
-            exon_intervals = exons.get_chromosome_annotations(wildcards.chrms)
-            contig.add_dfe(intervals=exon_intervals, DFE=dfe)
-
-        if selection == "all":
+        if annotation_id == "all":
             # Adding selection to the whole contig
             contig.add_dfe(intervals=np.array([[0, int(contig.length)]]), DFE=dfe)
 
-        if selection == "none":
+        if annotation_id == "none":
             # if selection is not specified then a neutral model is expected
             contig = species.get_contig(wildcards.chrms, genetic_map=genetic_map_id)
 
-        ts = engine.simulate(model, contig, samples, seed=wildcards.seeds, slim_scaling_factor=1,
+        else:
+            ## Adding annotation only seletion on exon region
+            annot = species.get_annotations(annotation_id)
+            annot_intervals = annot.get_chromosome_annotations(wildcards.chrms)
+            contig.add_dfe(intervals=annot_intervals, DFE=dfe)
+
+        ts = engine.simulate(model, contig, samples, seed=wildcards.seeds, slim_scaling_factor=config["slim_scaling_factor"],
             slim_burn_in=10)
         ts.dump(output[0])
 
@@ -205,13 +202,13 @@ rule sp_download:
 rule run_stairwayplot:
     input:
         expand(output_dir + "/Intermediate/{seeds}/{chrms}_{selection}.trees",
-            chrms=chrm_list, seeds=seed_array, selection=selection_list),
+            chrms=chrm_list, seeds=seed_array, selection=selection),
         stairwayplot_code,
     output: output_dir + "/Results/{seeds}/stairwayplot_estimated_Ne_{selection}.txt"
     threads: 20
     run:
         inputs = expand(output_dir + "/Intermediate/{seeds}/{chrms}_{selection}.trees",
-            seeds=wildcards.seeds, chrms=chrm_list, selection=selection_list)
+            seeds=wildcards.seeds, chrms=chrm_list, selection=selection)
         # fix here to be able to run a list of selection items in one goal
         runner = stairway.StairwayPlotRunner(
             workdir= output_dir + "/stairwayplot/" + wildcards.seeds+"/",
@@ -223,7 +220,7 @@ rule run_stairwayplot:
 
 def ne_files(wildcards):
     return expand(output_dir + "/Results/{seeds}/stairwayplot_estimated_Ne_{selection}.txt",
-            seeds=seed_array, chrms=chrm_list, selection=selection_list)
+            seeds=seed_array, chrms=chrm_list, selection=selection)
 
 
 rule compound_stairwayplot:
@@ -307,9 +304,6 @@ rule compound_smcpp:
 # ###############################################################################
 
 rule ts_to_multihep:
-    #input:
-    #     expand(output_dir + "/Intermediate/{seeds}/{chrms}_{selection}.trees",
-    #         chrms=chrm_list, seeds=seed_array, selection=selection_list)
     input: rules.simulation.output
     output: output_dir + "/Intermediate/{seeds}/{samps}.{chrms}_{selection}.trees.multihep.txt"
     run: msmc.write_msmc_file(input[0], num_sampled_genomes_msmc, selection, mask_file)
@@ -320,12 +314,12 @@ rule run_msmc:
         # TODO make this NOT dependent on all simulations.
         # is there anyway to get access to wildcards.seeds from here? 
         expand(output_dir + "/Intermediate/{seeds}/{samps}.{chrms}_{selection}.trees.multihep.txt",
-            chrms=chrm_list, seeds=seed_array, samps=num_sampled_genomes_msmc, selection=selection_list)
+            chrms=chrm_list, seeds=seed_array, samps=num_sampled_genomes_msmc, selection=selection)
     output: output_dir + "/Intermediate/{seeds}/{samps}.{selection}.trees.multihep.txt.final.txt"
     threads: 8 
     run: 
         inputs = expand(output_dir + "/Intermediate/{seeds}/{samps}.{chrms}_{selection}.trees.multihep.txt",
-            seeds=wildcards.seeds, samps=wildcards.samps, chrms=chrm_list, selection=selection_list)
+            seeds=wildcards.seeds, samps=wildcards.samps, chrms=chrm_list, selection=selection)
         input_file_string = " ".join(inputs)
         output_file_string = output_dir + f"/Intermediate/{wildcards.seeds}/{wildcards.samps}.{selection}.trees.multihep.txt"
         print("This is the string")
@@ -377,10 +371,10 @@ rule all_plot:
 
 rule clean:
     shell:
-#         f"rm -rf stairwayplot \
-#             stairwayplot.tar.gz \
-#             {output_dir}/Intermediate \
-#             {output_dir}/Results \
-#             {output_dir}/stairwayplot \
-#             .genetic_map_downloaded \
-        "rm -rf .snakemake"
+         f"rm -rf stairwayplot \
+            stairwayplot.tar.gz \
+            {output_dir}/Intermediate \
+            {output_dir}/Results \
+            {output_dir}/stairwayplot \
+            .genetic_map_downloaded \
+            rm -rf .snakemake"

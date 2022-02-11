@@ -51,8 +51,9 @@ might look like this:
     "chrm_list" : "chr22",
     "mask_file" : "masks/HapmapII_GRCh37.mask.bed",
     "dfe_id": "Gamma_K17",
-    "selection":"all", 
-    "annotation_id": "ensembl_havana_104_exons"
+    "annotation_id":"ensembl_havana_104_exons,exons", 
+    "slim_scaling_factor" : 1,
+    ""
 }
 ```
 
@@ -108,7 +109,7 @@ The current final output is a plot comparing stairwayplot and smc++ estimates of
 with selection being 'none', 'all' or applied to the 'exons'.
 
 
-## Parameter Description
+## Config file Parameter Description
 
 `seed` : `<class 'int'>` 
 This sets the seed such that any analysis configuration
@@ -160,11 +161,11 @@ Set to "all" to simulate all chromosomes for the genome.
 to be masked out of the analysis.
 
 `dfe_id`: `<class 'str'>` A string indicating what Distribution of Fitness Effects to use.
-See http://sesame.uoregon.edu/~adkern/stdpopsim/doc/catalog.html to check all the possible DFEs
+See the [catalog](https://popsim-consortium.github.io/stdpopsim-docs/latest/catalog.html) to check all the possible DFEs.
 
-`selection`: `<class 'str'>` A string indicating where the DFE should be applied. So far three
-options are allowed: 'exons', where selection is imposed on exons, 'none', and 'all' –– in which 
-selection is insert in the entire contig under subject. 
+`annotation_id` : `<class 'str'>`,`<class 'str'>`  A string indicating where the DFE should be applied followed by the name of the data. 
+If applied to the 'exons', then an annotation name needs to be given see [here](https://popsim-consortium.github.io/stdpopsim-docs/latest/catalog.html#sec_catalog_HomSap_annotations) for humans. If set to 'none', 
+a neutral model is applied. And if set to 'all' then selection is insert in the entire contig under subject. 
 
-`annotation_id`:  `<class 'str'>` A string indicating the annotation file to be used. For humans,
-the two annotations available are: ensembl_havana_104_exons and ensembl_havana_104_CDS.
+`annotation_id` : `<class 'int'>`
+
