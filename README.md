@@ -37,6 +37,18 @@ A small example to simulate genomes with selection is described below.
 
 # Simulating selection with stdpopsim
 
+# Installing the requirements
+
+```
+conda create --name stdpopsim-analysis2 python=3.8
+conda activate stdpopsim-analysis2
+conda install -c conda-forge --file conda-requirements.txt
+pip install -r requirements.txt
+```
+
+#Simulating selelection with stdpopsim
+
+
 For each HomSap chromosome one can simulate selection in specific regions (e.g. coding region)
 by using the function in stdpopsim and passed to
 `stdpopsim.species.get_annotations` (see [the catalog](https://popsim-consortium.github.io/stdpopsim-docs/latest/tutorial.html#simulating-selection-on-exons) for details). Below is a complete example
