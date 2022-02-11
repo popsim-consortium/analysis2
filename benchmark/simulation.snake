@@ -61,7 +61,7 @@ rule simulation:
         if wildcards.demog == 'Constant': 
             model = stdpopsim.PiecewiseConstantSize(species.population_size)
             mutation_rate = 1.29e-08
-            samples = model.get_samples(100)
+            samples = model.get_samples(300)
         else: 
             model = species.get_demographic_model(wildcards.demog)
             mutation_rate = model.mutation_rate

@@ -11,6 +11,7 @@ import plots
 
 configfile: "config/snakemake/config.yaml"
 
+
 np.random.seed(config["seed"])
 
 # ###############################################################################
@@ -26,8 +27,8 @@ output_dir = os.path.abspath(config["output_dir"])
 # The analysis species
 species = stdpopsim.get_species(config["species"])
 
-# The specific model you would like to run
-model = species.get_demographic_model("OutOfAfrica_3G09")
+# The specific models you would like to run
+demo_model_array = config["demo_models"]
 
 # The number of samples to simulate for within each population
 num_samples_per_population = config["num_samples_per_population"]
@@ -48,13 +49,16 @@ seed_array = np.random.random_integers(1,2**31,replicates)
 # polyDFE
 poly_dfe_exec = config["poly_dfe_exec"]
 
-# Select DFE model from catalog                                                                                                                   
-h17_dfe = species.get_dfe("Gamma_H17")
+# Select DFE model from catalog  
+dfe_list = config["dfe_list"]   
 
 rule all:
     input: 
         #expand(output_dir + "/inference/OutOfAfrica_3G09/polyDFE/{chrms}/pop{ids}.polyDFE.bestfits", chrms=chrm_list, ids=[0, 1, 2])
-        expand("plots/{chrms}/dfe.inference.benchmark.pdf", chrms=chrm_list)
+        expand(output_dir + "/plots/{demog}/{chrms}/{dfes}/dfe.inference.benchmark.pdf",
+            chrms=chrm_list,
+            demog=demo_model_array,
+            dfes=dfe_list)
 
 # ###############################################################################
 # dadi
@@ -175,9 +179,9 @@ rule all:
 
 rule generate_polydfe_fs:
     input:
-        output_dir + "/simulated_data/OutOfAfrica_3G09/{seeds}/sim_OutOfAfrica_3G09_HuberDFE_{chrms}.trees"
+        output_dir + "/simulated_data/{seeds}/{demog}/{dfes}/sim_{chrms}.trees"
     output:
-        output_dir + "/inference/OutOfAfrica_3G09/polyDFE/{seeds}/{chrms}/pop{ids}/pop{ids}.polyDFE.fs"
+        output_dir + "/inference/{demog}/polyDFE/{seeds}/{dfes}/{chrms}/pop{ids}/pop{ids}.polyDFE.fs"
     threads: 1
     resources: time_min=60, mem_mb=5000, cpus=1
     run:
@@ -192,13 +196,23 @@ rule generate_polydfe_fs:
         elif index == 1: samps = ts.samples()[100:120]
         elif index == 2: samps = ts.samples()[200:220]
 
+        #elif wildcards.demog == 'Constant':
+        #    if index == 1: 
+        #        samps = ts.samples()[20:40]
+        #    else:
+        #        samps = ts.samples()[40:60]
+        #else:
+        #    if index == 1: 
+        #        samps = ts.samples()[100:120]
+        #    elif index == 2: samps = ts.samples()[200:220]
+
         ts2fs.generate_fs(ts, samps, seq_len, neu_prop, nonneu_prop, output, format='polydfe')
 
 rule run_polydfe:
     input: 
         rules.generate_polydfe_fs.output
     output: 
-        output_dir + "/inference/OutOfAfrica_3G09/polyDFE/{seeds}/{chrms}/pop{ids}/pop{ids}.polyDFE.results"
+        output_dir + "/inference/{demog}/polyDFE/{seeds}/{dfes}/{chrms}/pop{ids}/pop{ids}.polyDFE.results"
     threads: 1
     resources: time_min=60, mem_mb=5000, cpus=1
     shell:
@@ -208,30 +222,34 @@ rule get_polydfe_bestfit:
     input:
         rules.run_polydfe.output
     output:
-        output_dir + "/inference/OutOfAfrica_3G09/polyDFE/{seeds}/{chrms}/pop{ids}/pop{ids}.polyDFE.bestfit"
+        output_dir + "/inference/{demog}/polyDFE/{seeds}/{dfes}/{chrms}/pop{ids}/pop{ids}.polyDFE.bestfit"
     threads: 1
     resources: time_min=60, mem_mb=5000, cpus=1
     shell:
         """
-        paste <(grep "Best joint likelihood" {output_dir}/inference/OutOfAfrica_3G09/polyDFE/{wildcards.seeds}/{wildcards.chrms}/pop{wildcards.ids}/pop{wildcards.ids}.polyDFE.results | awk '{{print $6}}') \
-              <(grep eps_an {output_dir}/inference/OutOfAfrica_3G09/polyDFE/{wildcards.seeds}/{wildcards.chrms}/pop{wildcards.ids}/pop{wildcards.ids}.polyDFE.results -A 3 | tail -1 | awk 'BEGIN{{OFS="\t"}}{{print $2,$3}}') \
-              <(grep eps_an {output_dir}/inference/OutOfAfrica_3G09/polyDFE/{wildcards.seeds}/{wildcards.chrms}/pop{wildcards.ids}/pop{wildcards.ids}.polyDFE.results -A 1 | tail -1 | awk '{{print $3}}') > {output}
+        paste <(grep "Best joint likelihood" {output_dir}/inference/{wildcards.demog}/polyDFE/{wildcards.seeds}/{wildcards.dfes}/{wildcards.chrms}/pop{wildcards.ids}/pop{wildcards.ids}.polyDFE.results | awk '{{print $6}}') \
+              <(grep eps_an {output_dir}/inference/{wildcards.demog}/polyDFE/{wildcards.seeds}/{wildcards.dfes}/{wildcards.chrms}/pop{wildcards.ids}/pop{wildcards.ids}.polyDFE.results -A 3 | tail -1 | awk 'BEGIN{{OFS="\t"}}{{print $2,$3}}') \
+              <(grep eps_an {output_dir}/inference/{wildcards.demog}/polyDFE/{wildcards.seeds}/{wildcards.dfes}/{wildcards.chrms}/pop{wildcards.ids}/pop{wildcards.ids}.polyDFE.results -A 1 | tail -1 | awk '{{print $3}}') > {output}
         """
 
 rule combine_polydfe_bestfits:
     input:
-        pop0_res = expand(output_dir + "/inference/OutOfAfrica_3G09/polyDFE/{seeds}/{chrms}/pop0/pop0.polyDFE.bestfit", seeds=seed_array, chrms=chrm_list),
-        pop1_res = expand(output_dir + "/inference/OutOfAfrica_3G09/polyDFE/{seeds}/{chrms}/pop1/pop1.polyDFE.bestfit", seeds=seed_array, chrms=chrm_list),
-        pop2_res = expand(output_dir + "/inference/OutOfAfrica_3G09/polyDFE/{seeds}/{chrms}/pop2/pop2.polyDFE.bestfit", seeds=seed_array, chrms=chrm_list)
+        pop0_res = output_dir + "/inference/{demog}/polyDFE/{seeds}/{dfes}/{chrms}/pop0/pop0.polyDFE.bestfit",
+        pop1_res = output_dir + "/inference/{demog}/polyDFE/{seeds}/{dfes}/{chrms}/pop1/pop1.polyDFE.bestfit", 
+        pop2_res = output_dir + "/inference/{demog}/polyDFE/{seeds}/{dfes}/{chrms}/pop2/pop2.polyDFE.bestfit", 
+   
     output:
-        expand(output_dir + "/inference/OutOfAfrica_3G09/polyDFE/{chrms}/pop{ids}.polyDFE.bestfits", chrms=chrm_list, ids=[0, 1, 2])
+        pop0_out = output_dir + "/inference/{demog}/polyDFE/{seeds}/{dfes}/{chrms}/pop0.polyDFE.bestfits",
+        pop1_out = output_dir + "/inference/{demog}/polyDFE/{seeds}/{dfes}/{chrms}/pop1.polyDFE.bestfits",
+        pop2_out = output_dir + "/inference/{demog}/polyDFE/{seeds}/{dfes}/{chrms}/pop2.polyDFE.bestfits",
+
     threads: 1
     resources: time_min=60, mem_mb=5000, cpus=1
     shell:
         """
-        cat {input.pop0_res} | sed '1i#likelihood\tS_d\tb\ttheta_bar' > {output[0]}
-        cat {input.pop1_res} | sed '1i#likelihood\tS_d\tb\ttheta_bar' > {output[1]}
-        cat {input.pop2_res} | sed '1i#likelihood\tS_d\tb\ttheta_bar' > {output[2]}
+        cat {input.pop0_res} | sed '1i#likelihood\tS_d\tb\ttheta_bar' > {output.pop0_out}
+        cat {input.pop1_res} | sed '1i#likelihood\tS_d\tb\ttheta_bar' > {output.pop1_out}
+        cat {input.pop2_res} | sed '1i#likelihood\tS_d\tb\ttheta_bar' > {output.pop2_out}
         """
 
 # ###############################################################################
@@ -259,13 +277,25 @@ rule combine_polydfe_bestfits:
 rule plot_results:
     input:
         #dadi_res = expand(output_dir + "/dadi/{chrms}/pop{ids}.dadi.dfe.bestfits", chrms=chrm_list, ids=[0, 1, 2]),
-        polydfe_res = expand(output_dir + "/inference/OutOfAfrica_3G09/polyDFE/{chrms}/pop{ids}.polyDFE.bestfits", chrms=chrm_list, ids=[0, 1, 2])
+        polydfe_res = expand(output_dir + f"/inference/{{demog}}/polyDFE/{{seeds}}/{{dfes}}/{{chrms}}/pop{{ids}}.polyDFE.bestfits",
+            demog=demo_model_array,
+            seeds=seed_array,
+            dfes=dfe_list,
+            chrms=chrm_list,
+            ids=[0,1,2]
+        )
     output:
-        "plots/{chrms}/dfe.inference.benchmark.pdf"
+        output_dir + "/plots/{demog}/{chrms}/{dfes}/dfe.inference.benchmark.pdf"
     threads: 1
     resources: time_min=60, mem_mb=5000, cpus=1
     run:
-        mu = model.mutation_rate
+        if wildcards.demog == 'Constant': 
+            model = stdpopsim.PiecewiseConstantSize(species.population_size)
+            mutation_rate = 1.29e-08
+        else: 
+            model = species.get_demographic_model(wildcards.demog)
+            mutation_rate = model.mutation_rate
+
         contig = species.get_contig(wildcards.chrms)
         seq_len = contig.recombination_map.sequence_length
-	plots.plot_all_results(mu, seq_len, input, output)
+        plots.plot_all_results(mutation_rate, seq_len, input, output)
