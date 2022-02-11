@@ -1,0 +1,87 @@
+"""
+Snakefile for running DFE benchmark on stdpopsim.
+"""
+
+import os
+import numpy as np
+import stdpopsim
+
+configfile: "config/snakemake/config.yaml"
+
+np.random.seed(config["seed"])
+
+# ###############################################################################
+# GENERAL RULES & GLOBALS
+# ###############################################################################
+
+# The number of replicates of each analysis you would like to run
+replicates = config["replicates"]
+# Where you would like all output files from analysis to live
+output_dir = os.path.abspath(config["output_dir"])
+
+# The analysis species
+species = stdpopsim.get_species(config["species"])
+
+# The number of samples to simulate for within each population
+num_samples_per_population = config["num_samples_per_population"]
+sample_sizes = dict()
+for i in range(len(num_samples_per_population)):
+    sample_sizes[str(i)] = num_samples_per_population[i]
+
+# The names of all chromosomes to simulate, separated by commas
+# Use "all" to simulate all chromsomes for the genome
+chrm_list = [chrom.id for chrom in species.genome.chromosomes]
+if "chrY" in chrm_list:
+    chrm_list.remove("chrY")
+if(config["chrm_list"] != "all"):
+    chrm_list = [chr for chr in config["chrm_list"].split(",")]
+
+seed_array = np.random.random_integers(1,2**31,replicates)
+
+# The specific demographic model you would like to run
+demo_model_array =  config["demo_models"]
+# Select DFE model from catalog  
+dfe_list = config["dfe_list"]
+
+# ###############################################################################
+# GENERAL RULES & GLOBALS
+# ###############################################################################
+
+rule all:
+    input:
+        expand(output_dir + "/simulated_data/{seeds}/{demog}/{dfes}/sim_{chrms}.trees", seeds=seed_array, demog=demo_model_array, dfes=dfe_list, chrms=chrm_list)
+
+rule simulation:
+    input:
+    output:
+        output_dir + "/simulated_data/{seeds}/{demog}/{dfes}/sim_{chrms}.trees"
+    threads: 1
+    resources: time_min=3000, mem_mb=10000, cpus=1
+    run:
+        if wildcards.demog == 'Constant': 
+            model = stdpopsim.PiecewiseConstantSize(species.population_size)
+            mutation_rate = 1.29e-08
+            samples = model.get_samples(300)
+        else: 
+            model = species.get_demographic_model(wildcards.demog)
+            mutation_rate = model.mutation_rate
+            samples = model.get_samples(*num_samples_per_population)  # YRI, CEU, CHB
+
+        contig = species.get_contig(wildcards.chrms)
+        contig.clear_dfes()
+        dfe = species.get_dfe(wildcards.dfes)
+        contig.add_dfe(
+            intervals=np.array([[0, int(contig.recombination_map.sequence_length)]]),
+            DFE=dfe,
+        )
+        contig.mutation_rate = mutation_rate
+        engine = stdpopsim.get_engine("slim")
+        ts = engine.simulate(
+            model,
+            contig,
+            samples,
+            slim_scaling_factor=10,
+            slim_burn_in=10,
+            seed=wildcards.seeds,
+        )
+        ts.dump(output[0])

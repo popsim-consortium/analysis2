@@ -1,10 +1,11 @@
 "seed": 12345
 "population_id": 0
 "num_samples_per_population": [100, 100, 100]
-"replicates": 1
+"replicates": 2
 "species": "HomSap"
-"model": "OutOfAfrica_3G09"
+"demo_models": ["Constant", "OutOfAfrica_3G09"]
 "genetic_map": "HapmapII_GRCh37"
 "chrm_list": "chr21"
+"dfe_list": ["Gamma_H17"]
 "output_dir": "results"
 "poly_dfe_exec": "../ext/polyDFE/polyDFE-2.0-linux-64-bit"
