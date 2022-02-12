@@ -2,3 +2,4 @@ numpy
 scikit-allel
 dadi
 slim
+tqdm
