@@ -1,53 +1,39 @@
 # Analysis 2
 Analysis of inference methods on standard population models including selection.
+Here's how to get going, if you'd like to run this analysis
 
-# How to set up your environment to run the analysis
-We recommend you start by creating a new `conda` environment for the analysis. 
-
-```
-conda create -n popsim_env python=3.7 
-conda activate popsim_env
-```
-
-Next, install `stdpopsim`
-```
-pip install git+https://github.com/popsim-consortium/stdpopsim.git
-```
-
+# Get the Analysis repo
 Now clone the analysis2 repo, and install its dependencies
 ```
 git clone https://github.com/popgensims/analysis2.git
 cd analysis2/
+```
 
-conda install --file requirements.txt --yes
-````
+# Set up your python environment to run the analysis
+We recommend you start by creating a new `conda` environment for the analysis. 
+
+```
+conda create -n analysis2 python=3.9 \
+    -c conda-forge --file conda-requirements.txt --yes
+conda activate analysis2
+pip install -r requirements.txt
+```
 
 For using `msmc` we need to download and compile it to play nice
 with the conda environment that we have set up.
 ```
-cd extern
+cd ext
 git clone https://github.com/stschiff/msmc.git
 cat msmc_makefile_stdpopsim_patch > msmc/Makefile && cd msmc && make
 cd ../../
 ```
 
+
 Further instructions can be currently found in each task directory.
 A small example to simulate genomes with selection is described below.
 
-
+------------
 # Simulating selection with stdpopsim
-
-# Installing the requirements
-
-```
-conda create --name stdpopsim-analysis2 python=3.8
-conda activate stdpopsim-analysis2
-conda install -c conda-forge --file conda-requirements.txt
-pip install -r requirements.txt
-```
-
-#Simulating selelection with stdpopsim
-
 
 For each HomSap chromosome one can simulate selection in specific regions (e.g. coding region)
 by using the function in stdpopsim and passed to

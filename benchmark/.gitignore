@@ -1,1 +1,3 @@
 results/
+.snakemake*
+n_t_with_s/.snakemake*
