@@ -74,10 +74,10 @@ else:
 # The genetic map you would like to use.
 # if value None is given default_recombination_rates are
 # used with a flat map
-genetic_map_id = config.get("genetic_map", None)
+genetic_map_id = config["genetic_map"]
 
 # The DFE id used for selection analyses
-dfe_id = config.get("dfe_id", None)
+dfe_id = config["dfe_list"][0] # need to generalize to more than one...
 
 # The GFF annotation id defining where selection will be simulated
 annotation_id, selection = config.get("annotation_id", None).split(",")
@@ -194,6 +194,7 @@ rule sp_download:
         stairwayplot_code
     message: 
         "downloading stairwayplot"
+    threads: 20
     shell:
         "wget http://sesame.uoregon.edu/~adkern/stdpopsim/stairwayplot.tar.gz && \
             tar zxf stairwayplot.tar.gz"

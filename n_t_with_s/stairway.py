@@ -57,16 +57,16 @@ class StairwayPlotRunner(object):
             total_length += ts.sequence_length
             num_samples = ts.num_samples
             haps = ts.genotype_matrix()
-            print(haps.shape)
+            # print(haps.shape)
 
             SFSs = []
             # Masking
-            print("This is the number of mutations")
-            print(ts.get_num_mutations())
-            print("This is the number of variants")
-            print(ts.variants())
-            print("This is the number of sites")
-            print(ts.num_sites)
+            # print("This is the number of mutations")
+            # print(ts.get_num_mutations())
+            # print("This is the number of variants")
+            # print(ts.variants())
+            # print("This is the number of sites")
+            # print(ts.num_sites)
             #retain = np.full(ts.get_num_mutations(), False)
 
             # This part is not really working (dimension problem)
@@ -84,8 +84,8 @@ class StairwayPlotRunner(object):
 
             #retain = retain.flatten()
             retain = np.logical_not(retain)
-            print("This is the shape of retain")
-            print(retain.shape)
+            # print("This is the shape of retain")
+            # print(retain.shape)
             # append unmasked SFS
             SFSs.append(allel.sfs(allel.HaplotypeArray(haps).count_alleles()[:, 1])[1:])
             # get masked allele counts and append SFS
@@ -119,8 +119,8 @@ class StairwayPlotRunner(object):
         """
         num_runs = 1
         dim_factor = 5000
-        print("This is the input file")
-        print(input_file)
+        # print("This is the input file")
+        # print(input_file)
         cmd = (
             f"{self.java_exe} -cp {self.classpath} Stairway_plot_theta_estimation02 "
             f"{input_file} {num_runs} {dim_factor}")

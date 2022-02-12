@@ -1,3 +1,13 @@
 dadi
 slim=3.7
 snakemake
+ldc
+seaborn
+pysam
+htslib
+ldc
+scipy
+attrs
+cython
+h5py
+blas
