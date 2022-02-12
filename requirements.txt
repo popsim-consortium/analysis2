@@ -1,5 +1,2 @@
-numpy
+git+https://github.com/popsim-consortium/stdpopsim.git
 scikit-allel
-dadi
-slim
-tqdm
