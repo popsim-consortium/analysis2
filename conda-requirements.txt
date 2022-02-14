@@ -12,4 +12,4 @@ h5py
 blas
 gsl
 dadi
-slim=3.7
+slim=3.7.1
