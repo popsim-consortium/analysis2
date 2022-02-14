@@ -5,7 +5,7 @@ Here's how to get going, if you'd like to run this analysis
 # Get the Analysis repo
 Now clone the analysis2 repo, and install its dependencies
 ```
-git clone https://github.com/popgensims/analysis2.git
+git clone git@github.com:popsim-consortium/analysis2.git
 cd analysis2/
 ```
 
