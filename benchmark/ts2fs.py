@@ -2,11 +2,11 @@ import dadi
 import numpy as np
 import tskit
 
+
 def _generate_fs_from_ts(ts, sample_sets=None):
     """
     """
-
-    if sample_sets is None: 
+    if sample_sets is None:
         sample_sets = [ts.samples()]
 
     def allele_counts(ts, sample_sets):
@@ -19,33 +19,48 @@ def _generate_fs_from_ts(ts, sample_sets=None):
                                     span_normalise=False, windows='sites',
                                     polarised=True, mode='site', strict=False)
 
-    mut_type = np.zeros(ts.num_sites)
+    # Mapping mutation type IDs to class of mutation (e.g., neutral, non-neutral)
+    mut_types = {}
+    for dfe in ts.metadata["stdpopsim"]["DFEs"]:
+        for mt in dfe["mutation_types"]:
+            mid = mt["slim_mutation_type_id"]
+            if not mid in mut_types:
+                mut_types[mid] = "neutral" if mt["is_neutral"] else "non_neutral"
+
+    # print("These are the mutation types", flush=True)
+    # print(mut_types, flush=True)
+
+    site_class = np.empty(ts.num_sites, dtype=object)
     for j, s in enumerate(ts.sites()):
         mt = []
         for m in s.mutations:
-            # print(m)
             for md in m.metadata["mutation_list"]:
                 mt.append(md["mutation_type"])
-        if len(set(mt)) > 1:
-            mut_type[j] = 3
-        else:
-            mut_type[j] = mt[0]
+        site_class[j] = mut_types[mt[0]] if len(mt) == 1 else "double_hit"
+    assert sum(site_class == None) == 0
+    # print("Number of sites per class is:", flush=True)
+    unique, counts = np.unique(site_class, return_counts=True)
+    # print(dict(zip(unique, counts)), flush=True)
 
-    freqs = allele_counts(ts, [sample_sets])
+    freqs = allele_counts(ts, sample_sets)
     freqs = freqs.flatten().astype(int)
-    mut_afs = np.zeros((len(sample_sets)+1, 3), dtype='int64')
-    for k in range(3):
-        #mut_afs[:, k] = np.bincount(freqs[mut_type == k+1], minlength=len(sample_sets) + 1)
-        mut_afs[:, k] = np.bincount(freqs[mut_type == k], minlength=len(sample_sets) + 1)
-
+    mut_classes = set(mut_types.values())
+    # Feeding a dictionary with afs for each mutation type
+    mut_afs = {}
+    for mc in mut_classes:
+        mut_afs[mc] = np.bincount(freqs[site_class == mc], minlength=len(sample_sets) + 1)
     return mut_afs
 
 def generate_fs(ts, sample_sets, seq_len, neu_prop, nonneu_prop, output, format):
     """
     """
+    # If just a single sample set is provided, we need to wrap it
+    # in a list to make it a list of sample setS
+    if not isinstance(sample_sets, list):
+        sample_sets = [sample_sets]
     mut_afs = _generate_fs_from_ts(ts, sample_sets)
-    neu_fs = mut_afs[:,0]
-    nonneu_fs = mut_afs[:,1]
+    neu_fs = mut_afs["neutral"]
+    nonneu_fs = mut_afs["non_neutral"]
 
     if format == 'dadi': _generate_dadi_fs(neu_fs, nonneu_fs, output)
     elif format == 'polydfe': _generate_polydfe_fs(neu_fs, nonneu_fs, seq_len, neu_prop, nonneu_prop, output)
@@ -110,7 +125,7 @@ def _generate_dfe_alpha_fs(ts, sample_sets, output):
 #            o.write("1\n")
 #            o.write(str(len(neu_fs)-1)+"\n")
 #            o.write(" ".join([str(round(f)) for f in nonneu_fs.data]) + "\n")
-#            o.write(" ".join([str(round(f)) for f in neu_fs.data]) + "\n") 
+#            o.write(" ".join([str(round(f)) for f in neu_fs.data]) + "\n")
     pass
 
 def _generate_anavar_fs(ts, sample_sets, output):
