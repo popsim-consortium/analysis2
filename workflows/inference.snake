@@ -9,8 +9,6 @@ import tskit
 import ts2fs
 import plots
 
-configfile: "config/snakemake/config.yaml"
-
 
 np.random.seed(config["seed"])
 
@@ -27,14 +25,7 @@ output_dir = os.path.abspath(config["output_dir"])
 # The analysis species
 species = stdpopsim.get_species(config["species"])
 
-# The specific models you would like to run
-demo_model_array = config["demo_models"]
 
-# The number of samples to simulate for within each population
-num_samples_per_population = config["num_samples_per_population"]
-sample_sizes = dict()
-for i in range(len(num_samples_per_population)):
-    sample_sizes[str(i)] = num_samples_per_population[i]
 
 # The names of all chromosomes to simulate, separated by commas
 # Use "all" to simulate all chromsomes for the genome
@@ -47,18 +38,27 @@ if(config["chrm_list"] != "all"):
 seed_array = np.random.random_integers(1,2**31,replicates)
 
 # polyDFE
-poly_dfe_exec = config["poly_dfe_exec"]
+poly_dfe_exec = os.path.abspath(config["poly_dfe_exec"])
+
+# The specific demographic model you would like to run
+demo_model_array =  config["demo_models"]
+demo_model_ids = [x["id"] for x in demo_model_array] 
+demo_sample_size_dict = {}
+for x in demo_model_array:
+    demo_sample_size_dict[x["id"]] = x["num_samples_per_population"]
 
 # Select DFE model from catalog  
 dfe_list = config["dfe_list"]   
+annotation_list = config["annotation_list"]
 
 rule all:
     input: 
         #expand(output_dir + "/inference/OutOfAfrica_3G09/polyDFE/{chrms}/pop{ids}.polyDFE.bestfits", chrms=chrm_list, ids=[0, 1, 2])
-        expand(output_dir + "/plots/{demog}/{chrms}/{dfes}/dfe.inference.benchmark.pdf",
+        expand(output_dir + "/plots/{demog}/{chrms}/{dfes}/{annots}/dfe.inference.benchmark.pdf",
             chrms=chrm_list,
-            demog=demo_model_array,
-            dfes=dfe_list)
+            demog=demo_model_ids,
+            dfes=dfe_list,
+            annots=annotation_list )
 
 # ###############################################################################
 # dadi
@@ -179,9 +179,9 @@ rule all:
 
 rule generate_polydfe_fs:
     input:
-        output_dir + "/simulated_data/{seeds}/{demog}/{dfes}/sim_{chrms}.trees"
+        output_dir + "/simulated_data/{demog}/{dfes}/{annots}/{seeds}/sim_{chrms}.trees"
     output:
-        output_dir + "/inference/{demog}/polyDFE/{seeds}/{dfes}/{chrms}/pop{ids}/pop{ids}.polyDFE.fs"
+        output_dir + "/inference/{demog}/polyDFE/{dfes}/{annots}/{seeds}/{chrms}/pop{ids}/pop{ids}.polyDFE.fs"
     threads: 1
     resources: time_min=60, mem_mb=5000, cpus=1
     run:
@@ -192,56 +192,48 @@ rule generate_polydfe_fs:
 
         ts = tskit.load(input[0])
         index = int(wildcards.ids)
-        if index == 0: samps = ts.samples()[:20]
-        elif index == 1: samps = ts.samples()[100:120]
-        elif index == 2: samps = ts.samples()[200:220]
-
-        #elif wildcards.demog == 'Constant':
-        #    if index == 1: 
-        #        samps = ts.samples()[20:40]
-        #    else:
-        #        samps = ts.samples()[40:60]
-        #else:
-        #    if index == 1: 
-        #        samps = ts.samples()[100:120]
-        #    elif index == 2: samps = ts.samples()[200:220]
-
-        ts2fs.generate_fs(ts, samps, seq_len, neu_prop, nonneu_prop, output, format='polydfe')
+        # TODO add subsample below?
+        samps = ts.samples(population=index)
+        if len(samps) != 0:
+            ts2fs.generate_fs(ts, samps, seq_len, neu_prop, nonneu_prop, output, format='polydfe')
+        else:
+            samps = ts.samples(population=0)
+            ts2fs.generate_fs(ts, samps, seq_len, neu_prop, nonneu_prop, output, format='polydfe')
 
 rule run_polydfe:
     input: 
         rules.generate_polydfe_fs.output
     output: 
-        output_dir + "/inference/{demog}/polyDFE/{seeds}/{dfes}/{chrms}/pop{ids}/pop{ids}.polyDFE.results"
+        output_dir + "/inference/{demog}/polyDFE/{dfes}/{annots}/{seeds}/{chrms}/pop{ids}/pop{ids}.polyDFE.results"
     threads: 1
     resources: time_min=60, mem_mb=5000, cpus=1
     shell:
-        poly_dfe_exec + " -d {input} -m C -i config/polyDFE/polyDFE_init_models.txt 1 -e > {output[0]}"
+        poly_dfe_exec + " -d {input} -m C -i workflows/config/polyDFE/polyDFE_init_models.txt 1 -e > {output[0]}"
 
 rule get_polydfe_bestfit:
     input:
         rules.run_polydfe.output
     output:
-        output_dir + "/inference/{demog}/polyDFE/{seeds}/{dfes}/{chrms}/pop{ids}/pop{ids}.polyDFE.bestfit"
+        output_dir + "/inference/{demog}/polyDFE/{dfes}/{annots}/{seeds}/{chrms}/pop{ids}/pop{ids}.polyDFE.bestfit"
     threads: 1
     resources: time_min=60, mem_mb=5000, cpus=1
     shell:
         """
-        paste <(grep "Best joint likelihood" {output_dir}/inference/{wildcards.demog}/polyDFE/{wildcards.seeds}/{wildcards.dfes}/{wildcards.chrms}/pop{wildcards.ids}/pop{wildcards.ids}.polyDFE.results | awk '{{print $6}}') \
-              <(grep eps_an {output_dir}/inference/{wildcards.demog}/polyDFE/{wildcards.seeds}/{wildcards.dfes}/{wildcards.chrms}/pop{wildcards.ids}/pop{wildcards.ids}.polyDFE.results -A 3 | tail -1 | awk 'BEGIN{{OFS="\t"}}{{print $2,$3}}') \
-              <(grep eps_an {output_dir}/inference/{wildcards.demog}/polyDFE/{wildcards.seeds}/{wildcards.dfes}/{wildcards.chrms}/pop{wildcards.ids}/pop{wildcards.ids}.polyDFE.results -A 1 | tail -1 | awk '{{print $3}}') > {output}
+        paste <(grep "Best joint likelihood" {output_dir}/inference/{wildcards.demog}/polyDFE/{wildcards.dfes}/{wildcards.annots}/{wildcards.seeds}/{wildcards.chrms}/pop{wildcards.ids}/pop{wildcards.ids}.polyDFE.results | awk '{{print $6}}') \
+              <(grep eps_an {output_dir}/inference/{wildcards.demog}/polyDFE/{wildcards.dfes}/{wildcards.annots}/{wildcards.seeds}/{wildcards.chrms}/pop{wildcards.ids}/pop{wildcards.ids}.polyDFE.results -A 3 | tail -1 | awk 'BEGIN{{OFS="\t"}}{{print $2,$3}}') \
+              <(grep eps_an {output_dir}/inference/{wildcards.demog}/polyDFE/{wildcards.dfes}/{wildcards.annots}/{wildcards.seeds}/{wildcards.chrms}/pop{wildcards.ids}/pop{wildcards.ids}.polyDFE.results -A 1 | tail -1 | awk '{{print $3}}') > {output}
         """
 
 rule combine_polydfe_bestfits:
     input:
-        pop0_res = output_dir + "/inference/{demog}/polyDFE/{seeds}/{dfes}/{chrms}/pop0/pop0.polyDFE.bestfit",
-        pop1_res = output_dir + "/inference/{demog}/polyDFE/{seeds}/{dfes}/{chrms}/pop1/pop1.polyDFE.bestfit", 
-        pop2_res = output_dir + "/inference/{demog}/polyDFE/{seeds}/{dfes}/{chrms}/pop2/pop2.polyDFE.bestfit", 
+        pop0_res = output_dir + "/inference/{demog}/polyDFE/{dfe}/{annots}/{seeds}/{chrms}/pop0/pop0.polyDFE.bestfit",
+        pop1_res = output_dir + "/inference/{demog}/polyDFE/{dfe}/{annots}/{seeds}/{chrms}/pop1/pop1.polyDFE.bestfit", 
+        pop2_res = output_dir + "/inference/{demog}/polyDFE/{dfe}/{annots}/{seeds}/{chrms}/pop2/pop2.polyDFE.bestfit", 
    
     output:
-        pop0_out = output_dir + "/inference/{demog}/polyDFE/{seeds}/{dfes}/{chrms}/pop0.polyDFE.bestfits",
-        pop1_out = output_dir + "/inference/{demog}/polyDFE/{seeds}/{dfes}/{chrms}/pop1.polyDFE.bestfits",
-        pop2_out = output_dir + "/inference/{demog}/polyDFE/{seeds}/{dfes}/{chrms}/pop2.polyDFE.bestfits",
+        pop0_out = output_dir + "/inference/{demog}/polyDFE/{dfe}/{annots}/{seeds}/{chrms}/pop0.polyDFE.bestfits",
+        pop1_out = output_dir + "/inference/{demog}/polyDFE/{dfe}/{annots}/{seeds}/{chrms}/pop1.polyDFE.bestfits",
+        pop2_out = output_dir + "/inference/{demog}/polyDFE/{dfe}/{annots}/{seeds}/{chrms}/pop2.polyDFE.bestfits",
 
     threads: 1
     resources: time_min=60, mem_mb=5000, cpus=1
@@ -274,18 +266,20 @@ rule combine_polydfe_bestfits:
 # plots
 # ###############################################################################
 
+
 rule plot_results:
     input:
         #dadi_res = expand(output_dir + "/dadi/{chrms}/pop{ids}.dadi.dfe.bestfits", chrms=chrm_list, ids=[0, 1, 2]),
-        polydfe_res = expand(output_dir + f"/inference/{{demog}}/polyDFE/{{seeds}}/{{dfes}}/{{chrms}}/pop{{ids}}.polyDFE.bestfits",
-            demog=demo_model_array,
+        polydfe_res = expand(output_dir + "/inference/{demog}/polyDFE/{dfes}/{annots}/{seeds}/{chrms}/pop{ids}.polyDFE.bestfits",
+            demog=demo_model_ids,
             seeds=seed_array,
             dfes=dfe_list,
+            annots=annotation_list,
             chrms=chrm_list,
             ids=[0,1,2]
         )
     output:
-        output_dir + "/plots/{demog}/{chrms}/{dfes}/dfe.inference.benchmark.pdf"
+        output_dir + "/plots/{demog}/{chrms}/{dfes}/{annots}/dfe.inference.benchmark.pdf"
     threads: 1
     resources: time_min=60, mem_mb=5000, cpus=1
     run:
@@ -298,4 +292,4 @@ rule plot_results:
 
         contig = species.get_contig(wildcards.chrms)
         seq_len = contig.recombination_map.sequence_length
-        plots.plot_all_results(mutation_rate, seq_len, input, output)
+        plots.plot_all_dfe_results(mutation_rate, seq_len, input, output)

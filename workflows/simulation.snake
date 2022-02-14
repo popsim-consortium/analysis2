@@ -6,7 +6,7 @@ import os
 import numpy as np
 import stdpopsim
 
-configfile: "config/snakemake/config.yaml"
+#configfile: "config/snakemake/config.yaml"
 
 np.random.seed(config["seed"])
 
@@ -40,8 +40,13 @@ seed_array = np.random.random_integers(1,2**31,replicates)
 
 # The specific demographic model you would like to run
 demo_model_array =  config["demo_models"]
+demo_sample_size_dict = {}
+for x in demo_model_array:
+    demo_sample_size_dict[x["id"]] = x["num_samples_per_population"]
+demo_model_ids = [x["id"] for x in demo_model_array] 
 # Select DFE model from catalog  
 dfe_list = config["dfe_list"]
+annotation_list = config["annotation_list"]
 
 # ###############################################################################
 # GENERAL RULES & GLOBALS
@@ -49,38 +54,53 @@ dfe_list = config["dfe_list"]
 
 rule all:
     input:
-        expand(output_dir + "/simulated_data/{seeds}/{demog}/{dfes}/sim_{chrms}.trees", seeds=seed_array, demog=demo_model_array, dfes=dfe_list, chrms=chrm_list)
+        expand(output_dir + "/simulated_data/{demog}/{dfes}/{annots}/{seeds}/sim_{chrms}.trees", 
+            seeds=seed_array, 
+            demog=demo_model_ids,
+            dfes=dfe_list,
+            annots=annotation_list,
+            chrms=chrm_list
+            )
 
 rule simulation:
     input:
     output:
-        output_dir + "/simulated_data/{seeds}/{demog}/{dfes}/sim_{chrms}.trees"
+        output_dir + "/simulated_data/{demog}/{dfes}/{annots}/{seeds}/sim_{chrms}.trees"
     threads: 1
     resources: time_min=3000, mem_mb=10000, cpus=1
     run:
+        
         if wildcards.demog == 'Constant': 
             model = stdpopsim.PiecewiseConstantSize(species.population_size)
             mutation_rate = 1.29e-08
-            samples = model.get_samples(300)
+            samples = model.get_samples(*demo_sample_size_dict[wildcards.demog])
         else: 
             model = species.get_demographic_model(wildcards.demog)
             mutation_rate = model.mutation_rate
-            samples = model.get_samples(*num_samples_per_population)  # YRI, CEU, CHB
+            samples = model.get_samples(*demo_sample_size_dict[wildcards.demog])  # YRI, CEU, CHB
 
-        contig = species.get_contig(wildcards.chrms)
+        genetic_map_id = config["genetic_map"]
+        contig = species.get_contig(wildcards.chrms, genetic_map=genetic_map_id)
         contig.clear_dfes()
         dfe = species.get_dfe(wildcards.dfes)
-        contig.add_dfe(
-            intervals=np.array([[0, int(contig.recombination_map.sequence_length)]]),
-            DFE=dfe,
-        )
+        if wildcards.annots == "all_sites":
+            # Adding selection to the whole contig
+            contig.add_dfe(intervals=np.array([[0, int(contig.length)]]), DFE=dfe)
+        elif wildcards.annots == "none":
+            contig = species.get_contig(wildcards.chrms, genetic_map=genetic_map_id)
+        else:
+          ## Adding annotation only seletion on exon region
+            annot = species.get_annotations(wildcards.annots)
+            annot_intervals = annot.get_chromosome_annotations(wildcards.chrms)
+            contig.add_dfe(intervals=annot_intervals, DFE=dfe)
+        
         contig.mutation_rate = mutation_rate
         engine = stdpopsim.get_engine("slim")
         ts = engine.simulate(
             model,
             contig,
             samples,
-            slim_scaling_factor=10,
+            slim_scaling_factor=config["slim_scaling_factor"],
             slim_burn_in=10,
             seed=wildcards.seeds,
         )

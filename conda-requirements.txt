@@ -8,6 +8,7 @@ numpy
 matplotlib
 attrs
 cython
+tqdm
 h5py
 blas
 gsl

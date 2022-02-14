@@ -63,7 +63,7 @@ def generate_fs(ts, sample_sets, seq_len, neu_prop, nonneu_prop, output, format)
     nonneu_fs = mut_afs["non_neutral"]
 
     if format == 'dadi': _generate_dadi_fs(neu_fs, nonneu_fs, output)
-    elif format == 'polydfe': _generate_polydfe_fs(neu_fs, nonneu_fs, seq_len, neu_prop, nonneu_prop, output)
+    elif format == 'polydfe': _generate_polydfe_fs(neu_fs, nonneu_fs, seq_len, neu_prop, nonneu_prop, sample_sets, output)
     elif format == 'dfe-alpha': _generate_dfe_alpha_fs(ts, sample_sets, output)
     elif format == 'anavar': _generate_anavar_fs(ts, sample_sets, output)
 
@@ -75,13 +75,13 @@ def _generate_dadi_fs(neu_fs, nonneu_fs, output):
     neu_fs.to_file(output[0])
     nonneu_fs.to_file(output[1])
 
-def _generate_polydfe_fs(neu_fs, nonneu_fs, seq_len, neu_prop, nonneu_prop, output):
+def _generate_polydfe_fs(neu_fs, nonneu_fs, seq_len, neu_prop, nonneu_prop, sample_sets, output):
     """
     """
     neu_len = round(seq_len * neu_prop)
     nonneu_len = round(seq_len * nonneu_prop)
     with open(output[0], 'w') as o:
-        o.write("1 1 20\n")
+        o.write(f"1 1 {len(sample_sets)}\n")
         o.write(" ".join([str(round(f)) for f in neu_fs[1:-1]]) + " " + str(neu_len) + "\n")
         o.write(" ".join([str(round(f)) for f in nonneu_fs[1:-1]]) + " " + str(nonneu_len) + "\n")
 

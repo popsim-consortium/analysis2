@@ -28,7 +28,7 @@ def getIntervalOverlap(intA, intB):
     return max(0, min(intA.right, intB.right) - max(intA.left, intB.left))
 
 
-def write_msmc_file(path, num_sampled_genomes_msmc, selection, mask_file=None):
+def write_msmc_file(path, output, num_sampled_genomes_msmc, mask_file=None):
     """
     take one .trees file and write out
     path.multihep.txt which acts as a single input to msmc
@@ -50,12 +50,9 @@ def write_msmc_file(path, num_sampled_genomes_msmc, selection, mask_file=None):
         dirr = os.path.dirname(path)
         filen = os.path.basename(path)
         sep = filen.split(".")
-        print(sep)
         chrom = sep[0].split("_")[0]
-        print("this is chrom")
-        print(chrom)
         sep.insert(0, str(sample_size))
-        output = os.path.join(dirr, ".".join(sep) + f".multihep.txt")
+        #output = os.path.join(dirr, ".".join(sep) + ".multihep.txt")
         fi = open(output, "w")
         prev = 0
         if mask_file:
@@ -72,6 +69,7 @@ def write_msmc_file(path, num_sampled_genomes_msmc, selection, mask_file=None):
         else:
             for var in ts.variants():
                 cur = int(var.site.position)
+                #print("here")
                 if cur > prev:
                     geno = ''.join(map(str, var.genotypes))
                     fi.write(f"{chrom}\t{cur}\t{cur-prev}\t{geno}\n")

@@ -44,7 +44,7 @@ class StairwayPlotRunner(object):
         self.classpath = "{}:{}".format(stairway_path, stairway_path / "swarmops.jar")
         self.java_exe = java_exe
 
-    def ts_to_stairway(self, ts_path, selection, num_bootstraps=1, mask_file=None):
+    def ts_to_stairway(self, ts_path, num_bootstraps=1, mask_file=None):
         """
         Converts the specified tskit tree sequence to text files used by
         stairway plot.
@@ -106,7 +106,7 @@ class StairwayPlotRunner(object):
         stairway_files = []
         for l in range(len(derived_counts_all)):
             sfs = allel.sfs(derived_counts_all[l])[1:]
-            filename = self.workdir / f"sfs_{l}_{selection}.txt"
+            filename = self.workdir / f"sfs_{l}_.txt"
             write_stairway_sfs(total_length, num_samples, sfs, filename)
             stairway_files.append(filename)
 
@@ -127,16 +127,16 @@ class StairwayPlotRunner(object):
         logging.info("Running:" + cmd)
         subprocess.run(cmd, shell=True, check=True)
 
-    def run_theta_estimation(self, selection, max_workers=None, show_progress=False):
+    def run_theta_estimation(self, max_workers=None, show_progress=False):
         with concurrent.futures.ThreadPoolExecutor(max_workers=max_workers) as executor:
             futures = [
                 executor.submit(self._run_theta_estimation, infile)
-                for infile in self.workdir.glob(f"sfs_*_{selection}.txt")]
+                for infile in self.workdir.glob(f"sfs_*.txt")]
             with tqdm.tqdm(total=len(futures), disable=not show_progress) as progress:
                 for future in concurrent.futures.as_completed(futures):
                     progress.update()
 
-    def run_summary(self, output_file, mutation_rate, generation_time, selection):
+    def run_summary(self, output_file, mutation_rate, generation_time):
         """
         Runs stairway plot summary files in the work dir, writing the
         output to output_file and with the given parameters.
@@ -144,7 +144,7 @@ class StairwayPlotRunner(object):
         # First we need to create a temporary directory for the files, stairway expects
         # only these files to be present in the directory.
         with tempfile.TemporaryDirectory() as tmpdir:
-            for infile in self.workdir.glob(f"*_{selection}.txt.addTheta"):
+            for infile in self.workdir.glob(f"*_.txt.addTheta"):
                 shutil.copy(infile, tmpdir)
             cmd = (
                 f"{self.java_exe} -cp {self.classpath} "
