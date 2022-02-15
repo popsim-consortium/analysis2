@@ -5,3 +5,4 @@ benchmark/.snakemake/*
 benchmark/logs_slurm/*
 workflows/.snakemake/*
 workflows/logs_slurm/*
+results/*
