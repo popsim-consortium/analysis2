@@ -44,7 +44,7 @@ poly_dfe_exec = os.path.abspath(config["poly_dfe_exec"])
 
 # The specific demographic model you would like to run
 demo_model_array =  config["demo_models"]
-demo_model_ids = [x["id"] for x in demo_model_array] 
+demo_model_id_list = [x["id"] for x in demo_model_array] 
 demo_sample_size_dict = {}
 for x in demo_model_array:
     demo_sample_size_dict[x["id"]] = x["num_samples_per_population"]
@@ -58,7 +58,7 @@ rule all:
         #expand(output_dir + "/inference/OutOfAfrica_3G09/polyDFE/{chrms}/pop{ids}.polyDFE.bestfits", chrms=chrm_list, ids=[0, 1, 2])
         expand(output_dir + "/plots/{demog}/{chrms}/{dfes}/{annots}/dfe.inference.benchmark.pdf",
             chrms=chrm_list,
-            demog=demo_model_ids,
+            demog=demo_model_id_list,
             dfes=dfe_list,
             annots=annotation_list )
 
@@ -273,7 +273,7 @@ rule plot_results:
     input:
         #dadi_res = expand(output_dir + "/dadi/{chrms}/pop{ids}.dadi.dfe.bestfits", chrms=chrm_list, ids=[0, 1, 2]),
         polydfe_res = expand(output_dir + "/inference/{demog}/polyDFE/{dfes}/{annots}/{seeds}/{chrms}/pop{ids}.polyDFE.bestfits",
-            demog=demo_model_ids,
+            demog=demo_model_id_list,
             seeds=seed_array,
             dfes=dfe_list,
             annots=annotation_list,
