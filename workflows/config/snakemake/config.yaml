@@ -1,7 +1,7 @@
 "seed": 123
 "population_id": 0
 "num_samples_per_population": [10, 10, 10]
-"replicates": 2
+"replicates": 1
 
 "species": "HomSap"
 "demo_models": [
@@ -26,7 +26,7 @@
 "num_sampled_genomes_msmc" : [2, 8]
 "num_sampled_genomes_per_replicate": [2, 8]
 "num_msmc_iterations" : 1
-"annotation_list": ["ensembl_havana_104_exons", "all_sites"]
+"annotation_list": ["ensembl_havana_104_exons"]
 
 # exe paths
 "poly_dfe_exec": "ext/polyDFE/polyDFE-2.0-linux-64-bit"

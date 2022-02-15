@@ -42,7 +42,7 @@ def _generate_fs_from_ts(ts, sample_sets=None):
     unique, counts = np.unique(site_class, return_counts=True)
     # print(dict(zip(unique, counts)), flush=True)
 
-    freqs = allele_counts(ts, sample_sets)
+    freqs = allele_counts(ts, [sample_sets])
     freqs = freqs.flatten().astype(int)
     mut_classes = set(mut_types.values())
     # Feeding a dictionary with afs for each mutation type
@@ -56,8 +56,8 @@ def generate_fs(ts, sample_sets, seq_len, neu_prop, nonneu_prop, output, format)
     """
     # If just a single sample set is provided, we need to wrap it
     # in a list to make it a list of sample setS
-    if not isinstance(sample_sets, list):
-        sample_sets = [sample_sets]
+    #if not isinstance(sample_sets, list):
+    #    sample_sets = [sample_sets]
     mut_afs = _generate_fs_from_ts(ts, sample_sets)
     neu_fs = mut_afs["neutral"]
     nonneu_fs = mut_afs["non_neutral"]
