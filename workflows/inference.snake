@@ -9,6 +9,8 @@ import tskit
 import ts2fs
 import plots
 
+configfile: "workflows/config/snakemake/config.yaml"
+
 
 np.random.seed(config["seed"])
 
