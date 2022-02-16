@@ -4,3 +4,5 @@ __pycache__
 workflows/.snakemake/*
 workflows/logs_slurm/*
 results/*
+.snakemake/*
+stairwayplot/*
