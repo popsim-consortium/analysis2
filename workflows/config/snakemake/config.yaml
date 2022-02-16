@@ -1,0 +1,34 @@
+"seed": 123
+"population_id": 0
+"num_samples_per_population": [10, 10, 10]
+"replicates": 1
+
+"species": "HomSap"
+"demo_models": [
+    {"id":"Constant", 
+    "num_samples_per_population": [10],
+    },
+    {"id":"OutOfAfrica_3G09",
+    "num_samples_per_population": [10,10, 10],
+    }
+]
+"genetic_map": "HapMapII_GRCh37"
+"chrm_list": "chr21"
+"dfe_list": ["Gamma_H17"]
+"output_dir": "results"
+
+
+# slim settings
+"slim_scaling_factor": 15
+"slim_burn_in": 10
+
+# n(t) specific configs
+"num_sampled_genomes_msmc" : [2, 8]
+"num_sampled_genomes_per_replicate": [2, 8]
+"num_msmc_iterations" : 1
+"annotation_list": ["ensembl_havana_104_exons"]
+
+# exe paths
+"poly_dfe_exec": "ext/polyDFE/polyDFE-2.0-linux-64-bit"
+"msmc_exec" : "ext/msmc/build/msmc"
+"stairwayplot_code" : "stairwayplot/swarmops.jar"

@@ -42,7 +42,8 @@ def _generate_fs_from_ts(ts, sample_sets=None):
     unique, counts = np.unique(site_class, return_counts=True)
     # print(dict(zip(unique, counts)), flush=True)
 
-    freqs = allele_counts(ts, sample_sets)
+    # currently this is only working on single popn SFS
+    freqs = allele_counts(ts, [sample_sets])
     freqs = freqs.flatten().astype(int)
     mut_classes = set(mut_types.values())
     # Feeding a dictionary with afs for each mutation type
@@ -56,14 +57,14 @@ def generate_fs(ts, sample_sets, seq_len, neu_prop, nonneu_prop, output, format)
     """
     # If just a single sample set is provided, we need to wrap it
     # in a list to make it a list of sample setS
-    if not isinstance(sample_sets, list):
-        sample_sets = [sample_sets]
+    #if not isinstance(sample_sets, list):
+    #    sample_sets = [sample_sets]
     mut_afs = _generate_fs_from_ts(ts, sample_sets)
     neu_fs = mut_afs["neutral"]
     nonneu_fs = mut_afs["non_neutral"]
 
     if format == 'dadi': _generate_dadi_fs(neu_fs, nonneu_fs, output)
-    elif format == 'polydfe': _generate_polydfe_fs(neu_fs, nonneu_fs, seq_len, neu_prop, nonneu_prop, output)
+    elif format == 'polydfe': _generate_polydfe_fs(neu_fs, nonneu_fs, seq_len, neu_prop, nonneu_prop, sample_sets, output)
     elif format == 'dfe-alpha': _generate_dfe_alpha_fs(ts, sample_sets, output)
     elif format == 'anavar': _generate_anavar_fs(ts, sample_sets, output)
 
@@ -75,13 +76,13 @@ def _generate_dadi_fs(neu_fs, nonneu_fs, output):
     neu_fs.to_file(output[0])
     nonneu_fs.to_file(output[1])
 
-def _generate_polydfe_fs(neu_fs, nonneu_fs, seq_len, neu_prop, nonneu_prop, output):
+def _generate_polydfe_fs(neu_fs, nonneu_fs, seq_len, neu_prop, nonneu_prop, sample_sets, output):
     """
     """
     neu_len = round(seq_len * neu_prop)
     nonneu_len = round(seq_len * nonneu_prop)
     with open(output[0], 'w') as o:
-        o.write("1 1 20\n")
+        o.write(f"1 1 {len(sample_sets)}\n")
         o.write(" ".join([str(round(f)) for f in neu_fs[1:-1]]) + " " + str(neu_len) + "\n")
         o.write(" ".join([str(round(f)) for f in nonneu_fs[1:-1]]) + " " + str(nonneu_len) + "\n")
 
