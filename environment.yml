@@ -1,0 +1,25 @@
+name: analysis2
+channels:
+  - conda-forge
+dependencies:
+  - python==3.8
+  - pip
+  - slim==3.7.1
+  - snakemake
+  - ldc
+  - seaborn
+  - pysam
+  - htslib
+  - scipy
+  - numpy
+  - matplotlib
+  - attrs
+  - cython
+  - tqdm
+  - h5py
+  - blas
+  - gsl
+  - dadi
+  - pip:
+    - git+https://github.com/popsim-consortium/stdpopsim.git
+    - scikit-allel

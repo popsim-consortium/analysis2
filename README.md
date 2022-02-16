@@ -10,13 +10,12 @@ cd analysis2/
 ```
 
 # Set up your python environment to run the analysis
-We recommend you start by creating a new `conda` environment for the analysis. 
+We recommend you start by creating a new `conda` environment for the analysis. This can be done using the command below, which will
+create a new `conda` env called `analysis2`
 
 ```
-conda create -n analysis2 python=3.9 \
-    -c conda-forge --file conda-requirements.txt --yes
+conda env create -f environment.yml
 conda activate analysis2
-pip install -r requirements.txt
 ```
 
 For using `msmc` we need to download and compile it to play nice
