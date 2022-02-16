@@ -1,3 +1,15 @@
+"""
+Snakefile for running analysis 2 on stdpopsim.
+
+Simply running snakemake -c all within this directory will run all analysis
+defined by the modules below.
+
+To run a single module (e.g. n_t workflow) one can do
+snakemake -c 1 --snakefile workflows/n_t.snake --dry-run
+
+Parameters are defined by the config.yaml file in 
+workflows/config/snakemake/
+"""
 
 configfile: "workflows/config/snakemake/config.yaml"
 

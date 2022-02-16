@@ -52,7 +52,6 @@ def write_msmc_file(path, output, num_sampled_genomes_msmc, mask_file=None):
         sep = filen.split(".")
         chrom = sep[0].split("_")[0]
         sep.insert(0, str(sample_size))
-        #output = os.path.join(dirr, ".".join(sep) + ".multihep.txt")
         fi = open(output, "w")
         prev = 0
         if mask_file:

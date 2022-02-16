@@ -42,6 +42,7 @@ def _generate_fs_from_ts(ts, sample_sets=None):
     unique, counts = np.unique(site_class, return_counts=True)
     # print(dict(zip(unique, counts)), flush=True)
 
+    # currently this is only working on single popn SFS
     freqs = allele_counts(ts, [sample_sets])
     freqs = freqs.flatten().astype(int)
     mut_classes = set(mut_types.values())

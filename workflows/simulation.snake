@@ -101,7 +101,7 @@ rule simulation:
             contig,
             samples,
             slim_scaling_factor=config["slim_scaling_factor"],
-            slim_burn_in=10,
+            slim_burn_in=config["slim_burn_in"],
             seed=wildcards.seeds,
         )
         ts.dump(output[0])
