@@ -68,21 +68,21 @@ class StairwayPlotRunner(object):
 
             site_class = np.empty(ts.num_sites, dtype=object)
 
-            # Finding synonymous positions
-            syn_positions = []
+            # Finding neutral positions
+            neu_positions = []
             for j, s in enumerate(ts.sites()):
                 mt = []
                 for m in s.mutations:
                     for md in m.metadata["mutation_list"]:
                         mt.append(md["mutation_type"])
                         if mut_types[md["mutation_type"]] == "neutral":
-                            syn_positions.append(m.site)
+                            neu_positions.append(m.site)
                 site_class[j] = mut_types[mt[0]] if len(mt) == 1 else "double_hit" 
             assert sum(site_class == None) == 0
 
             SFSs = []
 
-            # Make it work, get ride off synonymous positions in the mask region
+            # Make it work, get ride off neutral positions that overlap the mask region
             retain = np.full(ts.get_num_mutations(), False)
             # This part is not really working (dimension problem)
             # Masking
@@ -99,17 +99,17 @@ class StairwayPlotRunner(object):
 
             # #retain = retain.flatten()
             #retain = np.logical_not(retain)
-            syn_positions = list(set(syn_positions))
+            neu_positions = list(set(neu_positions))
 
-            # Extract synonymous positions haplotypes
-            haps_syn = haps[syn_positions,:]            
+            # Extract neutral positions haplotypes
+            haps_neu = haps[neu_positions,:]            
 
             # append unmasked SFS
-            SFSs.append(allel.sfs(allel.HaplotypeArray(haps_syn).count_alleles()[:, 1])[1:])
+            SFSs.append(allel.sfs(allel.HaplotypeArray(haps_neu).count_alleles()[:, 1])[1:])
 
-            allele_counts = allel.HaplotypeArray(haps_syn).count_alleles()
+            allele_counts = allel.HaplotypeArray(haps_neu).count_alleles()
             # get masked allele counts and append SFS
-            #allele_counts = allel.HaplotypeArray(haps_syn[retain,:]).count_alleles()
+            #allele_counts = allel.HaplotypeArray(haps_neu[retain,:]).count_alleles()
 
             SFSs.append(allel.sfs(allele_counts[:, 1])[1:])
             sfs_path = ts_p+".sfs.pdf"
