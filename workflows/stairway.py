@@ -57,21 +57,36 @@ class StairwayPlotRunner(object):
             total_length += ts.sequence_length
             num_samples = ts.num_samples
             haps = ts.genotype_matrix()
-            # print(haps.shape)
+
+            # Mapping mutation type IDs to class of mutation (e.g., neutral, non-neutral)
+            mut_types = {}
+            for dfe in ts.metadata["stdpopsim"]["DFEs"]:
+                for mt in dfe["mutation_types"]:
+                    mid = mt["slim_mutation_type_id"]
+                    if not mid in mut_types:
+                        mut_types[mid] = "neutral" if mt["is_neutral"] else "non_neutral"
+
+            site_class = np.empty(ts.num_sites, dtype=object)
+
+            # Finding synonymous positions
+            syn_positions = []
+            for j, s in enumerate(ts.sites()):
+                mt = []
+                for m in s.mutations:
+                    for md in m.metadata["mutation_list"]:
+                        mt.append(md["mutation_type"])
+                        if mut_types[md["mutation_type"]] == "neutral":
+                            syn_positions.append(m.site)
+                site_class[j] = mut_types[mt[0]] if len(mt) == 1 else "double_hit" 
+            assert sum(site_class == None) == 0
 
             SFSs = []
-            # Masking
-            # print("This is the number of mutations")
-            # print(ts.get_num_mutations())
-            # print("This is the number of variants")
-            # print(ts.variants())
-            # print("This is the number of sites")
-            # print(ts.num_sites)
-            #retain = np.full(ts.get_num_mutations(), False)
 
+            # Make it work, get ride off synonymous positions in the mask region
+            retain = np.full(ts.get_num_mutations(), False)
             # This part is not really working (dimension problem)
             # Masking
-            retain = np.full(ts.num_sites, False)
+            #retain = np.full(ts.num_sites, False)
             # if mask_file:
             #     mask_table = pd.read_csv(mask_file, sep="\t", header=None)
             #     chrom = ts_p.split("/")[-1].split(".")[0]
@@ -82,15 +97,20 @@ class StairwayPlotRunner(object):
             #     retain = np.logical_or(retain, tmp_bool)
             #     total_length -= np.sum(mask_ints.length)
 
-            #retain = retain.flatten()
-            retain = np.logical_not(retain)
-            # print("This is the shape of retain")
-            # print(retain.shape)
+            # #retain = retain.flatten()
+            #retain = np.logical_not(retain)
+            syn_positions = list(set(syn_positions))
+
+            # Extract synonymous positions haplotypes
+            haps_syn = haps[syn_positions,:]            
+
             # append unmasked SFS
-            SFSs.append(allel.sfs(allel.HaplotypeArray(haps).count_alleles()[:, 1])[1:])
+            SFSs.append(allel.sfs(allel.HaplotypeArray(haps_syn).count_alleles()[:, 1])[1:])
+
+            allele_counts = allel.HaplotypeArray(haps_syn).count_alleles()
             # get masked allele counts and append SFS
-            allele_counts = allel.HaplotypeArray(haps[retain,:]).count_alleles()
-            #allele_counts = allel.HaplotypeArray(haps).count_alleles()
+            #allele_counts = allel.HaplotypeArray(haps_syn[retain,:]).count_alleles()
+
             SFSs.append(allel.sfs(allele_counts[:, 1])[1:])
             sfs_path = ts_p+".sfs.pdf"
             plots.plot_sfs(SFSs, sfs_path)
@@ -111,6 +131,7 @@ class StairwayPlotRunner(object):
             stairway_files.append(filename)
 
         return stairway_files
+
 
     def _run_theta_estimation(self, input_file):
         """
