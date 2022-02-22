@@ -28,7 +28,7 @@ def getIntervalOverlap(intA, intB):
     return max(0, min(intA.right, intB.right) - max(intA.left, intB.left))
 
 
-def write_msmc_file(path, output, num_sampled_genomes_msmc, mask_file=None):
+def write_msmc_file(path, output, num_sampled_genomes_msmc, mask_intervals=None):
     """
     take one .trees file and write out
     path.multihep.txt which acts as a single input to msmc
@@ -36,32 +36,25 @@ def write_msmc_file(path, output, num_sampled_genomes_msmc, mask_file=None):
     This seems hacky atm, but let's getting working then hash out
     the details
     """
-    # make the mask intervalindex?
-    if mask_file:
-        mask_table = pd.read_csv(mask_file, sep="\t", header=None)
-        mask_dict = {}
-        for key in mask_table[0].unique():
-            sub = mask_table[mask_table[0] == key]
-            mask_dict[key] = pd.IntervalIndex.from_arrays(sub[1], sub[2])
-        print(mask_dict)
 
     for sample_size in num_sampled_genomes_msmc:
         ts = prune_tree_sequence(path, sample_size)
         dirr = os.path.dirname(path)
         filen = os.path.basename(path)
         sep = filen.split(".")
-        chrom = sep[0].split("_")[0]
+        chrom = sep[0].split("_")[1] # fixing sim_ name
         sep.insert(0, str(sample_size))
         fi = open(output, "w")
         prev = 0
-        if mask_file:
+        if mask_intervals is not None:
+            mask_intervals = pd.IntervalIndex.from_arrays(mask_intervals[:,0], mask_intervals[:,1])
             for var in ts.variants():
                 cur = int(var.site.position)
-                if cur > prev and (not mask_dict[chrom].contains(cur)):
+                if cur > prev and sum(mask_intervals.contains(cur)) == 0:
                     cur_int = pd.Interval(left=prev, right=cur)
                     masked_bit = np.sum([getIntervalOverlap(cur_int, x) for x in
-                                         mask_dict[chrom]])
-                    span = cur_int.length - masked_bit
+                                         mask_intervals])
+                    span = cur_int.length - masked_bit 
                     geno = ''.join(map(str, var.genotypes))
                     fi.write(f"{chrom}\t{cur}\t{span}\t{geno}\n")
                     prev = cur

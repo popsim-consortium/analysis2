@@ -36,15 +36,17 @@ class StairwayPlotRunner(object):
     """
     Run stairway plots.
     """
+
     def __init__(self, workdir, stairway_dir, java_exe="java"):
         self.workdir = pathlib.Path(workdir)
         shutil.rmtree(self.workdir, ignore_errors=True)
         self.workdir.mkdir(parents=True)
         stairway_path = pathlib.Path(stairway_dir)
-        self.classpath = "{}:{}".format(stairway_path, stairway_path / "swarmops.jar")
+        self.classpath = "{}:{}".format(
+            stairway_path, stairway_path / "swarmops.jar")
         self.java_exe = java_exe
 
-    def ts_to_stairway(self, ts_path, num_bootstraps=1, mask_file=None):
+    def ts_to_stairway(self, ts_path, num_bootstraps=1, mask_intervals=None):
         """
         Converts the specified tskit tree sequence to text files used by
         stairway plot.
@@ -55,53 +57,71 @@ class StairwayPlotRunner(object):
         for i, ts_p in enumerate(ts_path):
             ts = tskit.load(ts_p)
             total_length += ts.sequence_length
+            # masking?
+            if mask_intervals is not None:
+                ts = ts.delete_intervals(mask_intervals)
+                total_length -= np.sum(mask_intervals[:, 1] - mask_intervals[:, 0])
             num_samples = ts.num_samples
             haps = ts.genotype_matrix()
-            # print(haps.shape)
 
-            SFSs = []
-            # Masking
-            # print("This is the number of mutations")
-            # print(ts.get_num_mutations())
-            # print("This is the number of variants")
-            # print(ts.variants())
-            # print("This is the number of sites")
-            # print(ts.num_sites)
-            #retain = np.full(ts.get_num_mutations(), False)
+            # Mapping mutation type IDs to class of mutation (e.g., neutral, non-neutral)
+            class_muts = {}
+            for dfe in ts.metadata["stdpopsim"]["DFEs"]:
+                for mt in dfe["mutation_types"]:
+                    mid = mt["slim_mutation_type_id"]
+                    if not mid in class_muts:
+                        class_muts[mid] = "neutral" if mt["is_neutral"] else "non_neutral"
 
-            # This part is not really working (dimension problem)
-            # Masking
-            retain = np.full(ts.num_sites, False)
-            # if mask_file:
-            #     mask_table = pd.read_csv(mask_file, sep="\t", header=None)
-            #     chrom = ts_p.split("/")[-1].split(".")[0]
-            #     sub = mask_table[mask_table[0] == chrom]
-            #     mask_ints = pd.IntervalIndex.from_arrays(sub[1], sub[2])
-            #     snp_locs = [int(x.site.position) for x in ts.variants()]
-            #     tmp_bool = [mask_ints.contains(x) for x in snp_locs]
-            #     retain = np.logical_or(retain, tmp_bool)
-            #     total_length -= np.sum(mask_ints.length)
+            site_class = np.empty(ts.num_sites, dtype=object)
 
-            #retain = retain.flatten()
-            retain = np.logical_not(retain)
-            # print("This is the shape of retain")
-            # print(retain.shape)
-            # append unmasked SFS
-            SFSs.append(allel.sfs(allel.HaplotypeArray(haps).count_alleles()[:, 1])[1:])
-            # get masked allele counts and append SFS
-            allele_counts = allel.HaplotypeArray(haps[retain,:]).count_alleles()
-            #allele_counts = allel.HaplotypeArray(haps).count_alleles()
-            SFSs.append(allel.sfs(allele_counts[:, 1])[1:])
-            sfs_path = ts_p+".sfs.pdf"
-            plots.plot_sfs(SFSs, sfs_path)
-            # Bootstrap allele counts
+            # Finding neutral positions
+            neu_positions = []
+            non_neu_positions = []
+            for j, s in enumerate(ts.sites()):
+                mut_hits = []
+                for m in s.mutations:
+                    for md in m.metadata["mutation_list"]:
+                        mut_hits.append(md["mutation_type"])
+                        if set(class_muts[md["mutation_type"]]) == set("neutral"):
+                            neu_positions.append(m.site)
+                        if set(class_muts[md["mutation_type"]]) == set("non_neutral"):
+                            non_neu_positions.append(m.site)
+                site_class[j] = class_muts[mut_hits[0]] if len(
+                    mut_hits) == 1 else "double_hit"
+            assert sum(site_class == None) == 0
+
+            # All SNP locs
+            snp_locs_all = ts.sites_position.astype(int)
+            snp_locs = snp_locs_all[neu_positions]
+            snp_locs_non_neutral = snp_locs_all[non_neu_positions]
+
+            # Extract neutral positions haplotypes
+            haps_neu = haps[neu_positions, :]
+            haps_non_neu = haps[non_neu_positions, :]
+
+            # plot unmasked neutral / non-neutral SFS
+            sfs = allel.sfs(allel.HaplotypeArray(
+                haps_neu).count_alleles()[:, 1])[1:]
+            sfs_path = ts_p+".sfs.neutral.pdf"
+            plots.plot_sfs([sfs], sfs_path)
+            if len(non_neu_positions) > 0:
+                sfs = allel.sfs(allel.HaplotypeArray(
+                    haps_non_neu).count_alleles()[:, 1])[1:]
+                sfs_path = ts_p+".sfs.non_neutral.pdf"
+                plots.plot_sfs([sfs], sfs_path)
+
+            # Bootstrap allele counts (neutral)
+            allele_counts = allel.HaplotypeArray(
+                haps_neu).count_alleles()
             derived_counts_all[0].extend(allele_counts[:, 1])
             for j in range(1, num_bootstraps + 1):
                 nsites = np.shape(allele_counts)[0]
-                bootset = np.random.choice(np.arange(0, nsites, 1), nsites, replace=True)
+                bootset = np.random.choice(
+                    np.arange(0, nsites, 1), nsites, replace=True)
                 bootac = allele_counts[bootset, :]
                 der_bootac = bootac[:, 1]
                 derived_counts_all[j].extend(der_bootac)
+
         # Get the SFS minus the 0 bin and write output
         stairway_files = []
         for l in range(len(derived_counts_all)):
@@ -119,8 +139,6 @@ class StairwayPlotRunner(object):
         """
         num_runs = 1
         dim_factor = 5000
-        # print("This is the input file")
-        # print(input_file)
         cmd = (
             f"{self.java_exe} -cp {self.classpath} Stairway_plot_theta_estimation02 "
             f"{input_file} {num_runs} {dim_factor}")
