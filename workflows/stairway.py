@@ -75,31 +75,32 @@ class StairwayPlotRunner(object):
                 for m in s.mutations:
                     for md in m.metadata["mutation_list"]:
                         mt.append(md["mutation_type"])
-                        if mut_types[md["mutation_type"]] == "neutral":
+                        if set(mut_types[md["mutation_type"]]) == set("neutral"):
                             neu_positions.append(m.site)
                 site_class[j] = mut_types[mt[0]] if len(mt) == 1 else "double_hit" 
             assert sum(site_class == None) == 0
 
+            # All SNP locs
+            snp_locs =  [int(x.site.position) for x in ts.variants()]
+            snp_locs = [snp_locs[index] for index in neu_positions]
+
             SFSs = []
 
             # Make it work, get ride off neutral positions that overlap the mask region
-            retain = np.full(ts.get_num_mutations(), False)
-            # This part is not really working (dimension problem)
-            # Masking
-            #retain = np.full(ts.num_sites, False)
-            # if mask_file:
-            #     mask_table = pd.read_csv(mask_file, sep="\t", header=None)
-            #     chrom = ts_p.split("/")[-1].split(".")[0]
-            #     sub = mask_table[mask_table[0] == chrom]
-            #     mask_ints = pd.IntervalIndex.from_arrays(sub[1], sub[2])
-            #     snp_locs = [int(x.site.position) for x in ts.variants()]
-            #     tmp_bool = [mask_ints.contains(x) for x in snp_locs]
-            #     retain = np.logical_or(retain, tmp_bool)
-            #     total_length -= np.sum(mask_ints.length)
+            retain = np.full(len(neu_positions), True)
+            if mask_file:
+                mask_table = pd.read_csv(mask_file, sep="\t", header=None)
+                chrom = ts_p.split("/")[-1].split(".")[0]
+                chrom = chrom.split("sim_")[1]
+                sub = mask_table[mask_table[0] == chrom]
+                mask_ints = pd.IntervalIndex.from_arrays(sub[1], sub[2])
+                tmp_bool = [mask_ints.contains(x) for x in snp_locs]
+                for i in range(len(tmp_bool)):
+                    if sum(tmp_bool[i]) > 0:
+                        retain[i] = False
+                total_length -= np.sum(mask_ints.length)
 
-            # #retain = retain.flatten()
-            #retain = np.logical_not(retain)
-            neu_positions = list(set(neu_positions))
+            neu_positions = list(neu_positions)
 
             # Extract neutral positions haplotypes
             haps_neu = haps[neu_positions,:]            
@@ -109,7 +110,7 @@ class StairwayPlotRunner(object):
 
             allele_counts = allel.HaplotypeArray(haps_neu).count_alleles()
             # get masked allele counts and append SFS
-            #allele_counts = allel.HaplotypeArray(haps_neu[retain,:]).count_alleles()
+            allele_counts = allel.HaplotypeArray(haps_neu[retain,:]).count_alleles()
 
             SFSs.append(allel.sfs(allele_counts[:, 1])[1:])
             sfs_path = ts_p+".sfs.pdf"
