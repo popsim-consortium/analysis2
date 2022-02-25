@@ -70,6 +70,7 @@ class StairwayPlotRunner(object):
 
             # Finding neutral positions
             neu_positions = []
+            non_neu_positions = []
             for j, s in enumerate(ts.sites()):
                 mt = []
                 for m in s.mutations:
@@ -77,44 +78,60 @@ class StairwayPlotRunner(object):
                         mt.append(md["mutation_type"])
                         if set(mut_types[md["mutation_type"]]) == set("neutral"):
                             neu_positions.append(m.site)
+                        if set(mut_types[md["mutation_type"]]) == set("non_neutral"):
+                            non_neu_positions.append(m.site)
                 site_class[j] = mut_types[mt[0]] if len(mt) == 1 else "double_hit" 
             assert sum(site_class == None) == 0
 
             # All SNP locs
             snp_locs =  [int(x.site.position) for x in ts.variants()]
             snp_locs = [snp_locs[index] for index in neu_positions]
+            snp_locs_non_neutral = [snp_locs[index] for index in non_neu_positions]
 
             SFSs = []
 
             # Make it work, get ride off neutral positions that overlap the mask region
             retain = np.full(len(neu_positions), True)
+            retain_non_neu = np.full(len(non_neu_positions), True)
             if mask_file:
                 mask_table = pd.read_csv(mask_file, sep="\t", header=None)
                 chrom = ts_p.split("/")[-1].split(".")[0]
                 chrom = chrom.split("sim_")[1]
                 sub = mask_table[mask_table[0] == chrom]
                 mask_ints = pd.IntervalIndex.from_arrays(sub[1], sub[2])
-                tmp_bool = [mask_ints.contains(x) for x in snp_locs]
-                for i in range(len(tmp_bool)):
-                    if sum(tmp_bool[i]) > 0:
+                tmp_bool_neu = [mask_ints.contains(x) for x in snp_locs]
+                tmp_bool_n_neu = [mask_ints.contains(x) for x in snp_locs_non_neutral]
+                for i in range(len(tmp_bool_neu)):
+                    if sum(tmp_bool_neu[i]) > 0:
                         retain[i] = False
+                for i in range(len(tmp_bool_n_neu)):
+                    if sum(tmp_bool_n_neu[i]) > 0:
+                        retain_non_neu[i] = False
                 total_length -= np.sum(mask_ints.length)
 
             neu_positions = list(neu_positions)
 
             # Extract neutral positions haplotypes
-            haps_neu = haps[neu_positions,:]            
+            haps_neu = haps[neu_positions,:]
+            haps_non_neu = haps[retain_non_neu,:]            
 
-            # append unmasked SFS
+            # append unmasked neutral SFS
             SFSs.append(allel.sfs(allel.HaplotypeArray(haps_neu).count_alleles()[:, 1])[1:])
 
             allele_counts = allel.HaplotypeArray(haps_neu).count_alleles()
             # get masked allele counts and append SFS
             allele_counts = allel.HaplotypeArray(haps_neu[retain,:]).count_alleles()
 
+            # append masked neutral SFS
             SFSs.append(allel.sfs(allele_counts[:, 1])[1:])
+            # append masked non neutral SFS
+            SFSs.append(allel.sfs(allel.HaplotypeArray(haps_non_neu).count_alleles()[:, 1])[1:])
+
             sfs_path = ts_p+".sfs.pdf"
+            # plotting masked and unmasked neutral SFSs and non neutral SFSs
             plots.plot_sfs(SFSs, sfs_path)
+
+
             # Bootstrap allele counts
             derived_counts_all[0].extend(allele_counts[:, 1])
             for j in range(1, num_bootstraps + 1):

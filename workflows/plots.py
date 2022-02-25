@@ -217,15 +217,18 @@ def plot_sfs(s, outfile):
     vals = []
     for i in range(len(s)):
         vals.append([int(x) for x in s[i]])
-    if len(s) == 2:
+    if len(s) == 3:
         f, ax = plt.subplots(1, 2, sharey=True, tight_layout=True, figsize=(8, 3))
         ax[0].bar(bins, vals[0])
         ax[1].bar(bins, vals[1])
+        ax[2].bar(bins, vals[2])
         ax[0].set_title("all sites")
-        ax[1].set_title("masked sites")
+        ax[1].set_title("masked neutral sites")
+        ax[1].set_title("masked non neutral sites")
         ax[0].set_ylabel("counts")
         ax[0].set_xlabel("derived allele frequency")
         ax[1].set_xlabel("derived allele frequency")
+        ax[2].set_xlabel("derived allele frequency")
         f.savefig(outfile, bbox_inches='tight')
         plt.close()
     else:
