@@ -67,7 +67,20 @@ def plot_compound_msmc(infiles, outfile, model):
     f.savefig(outfile, bbox_inches='tight')
 
 
-def plot_all_ne_estimates(sp_infiles, msmc_infiles, outfile,
+def plot_compound_gone(infiles, outfile):
+    """
+    figure of N(t) for multiple runs of stairwayplot
+    """
+    f, ax = plt.subplots(figsize=(7, 7))
+    ax.set(xscale="log", yscale="log")
+    for infile in infiles:
+        nt = pd.read_csv(infile, sep="\t", skiprows=1)
+        nt = nt[nt['Generation'] > 10]
+        ax.plot(nt['Generation'], nt['Geometric_mean'], c="red")
+    f.savefig(outfile, bbox_inches='tight')
+
+
+def plot_all_ne_estimates(sp_infiles, msmc_infiles, gone_infiles, outfile,
                           model, n_samp, generation_time, species,
                           pop_id=0, steps=None): # smcpp_infiles,
     #ddb = model.get_demography_debugger()
@@ -94,7 +107,7 @@ def plot_all_ne_estimates(sp_infiles, msmc_infiles, outfile,
     steps = steps * generation_time
     num_msmc = set([os.path.basename(infile).split(".")[0] for infile in msmc_infiles])
     num_msmc = sorted([int(x) for x in num_msmc])
-    f, ax = plt.subplots(1, 2+len(num_msmc), sharex=True, sharey=True, figsize=(14, 7))
+    f, ax = plt.subplots(1, 3+len(num_msmc), sharex=True, sharey=True, figsize=(14, 7))
 
     outLines = []
     # for i, infile in enumerate(smcpp_infiles):
@@ -127,8 +140,15 @@ def plot_all_ne_estimates(sp_infiles, msmc_infiles, outfile,
                 ct += 1
         ax[2+i].plot(steps, 1/(2*coal_rate), c="black")
         ax[2+i].set_title(f"msmc, ({sample_size} samples)")
+    for i, infile in enumerate(gone_infiles):
+        nt = pd.read_csv(infile, sep="\t", skiprows=1)
+        line2, = ax[4].plot(nt['Generation'], nt['Geometric_mean'], alpha=0.8)
+        for j in range(0, len(nt["Generation"]), 2):
+            outLines.append([nt["Generation"][j], nt["Geometric_mean"][j], "gone"])
+    ax[4].plot(steps, 1/(2*coal_rate), c="black")
+    ax[4].set_title("GONE")
     plt.suptitle(f"{species}, population id {pop_id}", fontsize=16)
-    for i in range(2+len(num_msmc)):
+    for i in range(3+len(num_msmc)):
         ax[i].set(xscale="log")
         ax[i].set_xlabel("time (years ago)")
     red_patch = mpatches.Patch(color='black', label='Coalescence rate derived Ne')
