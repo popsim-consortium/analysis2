@@ -84,9 +84,9 @@ class StairwayPlotRunner(object):
             assert sum(site_class == None) == 0
 
             # All SNP locs
-            snp_locs =  [int(x.site.position) for x in ts.variants()]
-            snp_locs = [snp_locs[index] for index in neu_positions]
-            snp_locs_non_neutral = [snp_locs[index] for index in non_neu_positions]
+            snp_locs_all =  [int(x.site.position) for x in ts.variants()]
+            snp_locs = [snp_locs_all[index] for index in neu_positions]
+            snp_locs_non_neutral = [snp_locs_all[index] for index in non_neu_positions]
 
             SFSs = []
 
@@ -113,10 +113,11 @@ class StairwayPlotRunner(object):
 
             # Extract neutral positions haplotypes
             haps_neu = haps[neu_positions,:]
-            haps_non_neu = haps[retain_non_neu,:]            
+            haps_non_neu = haps[non_neu_positions,:]            
 
             # append unmasked neutral SFS
             SFSs.append(allel.sfs(allel.HaplotypeArray(haps_neu).count_alleles()[:, 1])[1:])
+            print(allel.sfs(allel.HaplotypeArray(haps_neu).count_alleles()[:, 1])[1:].shape)
 
             allele_counts = allel.HaplotypeArray(haps_neu).count_alleles()
             # get masked allele counts and append SFS
@@ -125,13 +126,13 @@ class StairwayPlotRunner(object):
             # append masked neutral SFS
             SFSs.append(allel.sfs(allele_counts[:, 1])[1:])
             # append masked non neutral SFS
-            SFSs.append(allel.sfs(allel.HaplotypeArray(haps_non_neu).count_alleles()[:, 1])[1:])
 
             sfs_path = ts_p+".sfs.pdf"
             # plotting masked and unmasked neutral SFSs and non neutral SFSs
-            plots.plot_sfs(SFSs, sfs_path)
-
-
+            try:
+                plots.plot_sfs([allel.sfs(allel.HaplotypeArray(haps_non_neu[retain_non_neu,:]).count_alleles()[:, 1])[1:]], ts_p+".sfs.non_neutral.pdf")
+            except:
+                continue
             # Bootstrap allele counts
             derived_counts_all[0].extend(allele_counts[:, 1])
             for j in range(1, num_bootstraps + 1):
@@ -140,6 +141,7 @@ class StairwayPlotRunner(object):
                 bootac = allele_counts[bootset, :]
                 der_bootac = bootac[:, 1]
                 derived_counts_all[j].extend(der_bootac)
+
         # Get the SFS minus the 0 bin and write output
         stairway_files = []
         for l in range(len(derived_counts_all)):
@@ -148,6 +150,7 @@ class StairwayPlotRunner(object):
             write_stairway_sfs(total_length, num_samples, sfs, filename)
             stairway_files.append(filename)
 
+        print(stairway_files)
         return stairway_files
 
 
@@ -163,6 +166,7 @@ class StairwayPlotRunner(object):
         cmd = (
             f"{self.java_exe} -cp {self.classpath} Stairway_plot_theta_estimation02 "
             f"{input_file} {num_runs} {dim_factor}")
+        print(cmd)
         logging.info("Running:" + cmd)
         subprocess.run(cmd, shell=True, check=True)
 
