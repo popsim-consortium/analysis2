@@ -222,7 +222,7 @@ def plot_sfs(s, outfile):
         ax[0].bar(bins, vals[0])
         ax[1].bar(bins, vals[1])
         ax[0].set_title("all sites")
-        ax[1].set_title("masked neutral sites")
+        ax[1].set_title("masked sites")
         ax[0].set_ylabel("counts")
         ax[0].set_xlabel("derived allele frequency")
         ax[1].set_xlabel("derived allele frequency")

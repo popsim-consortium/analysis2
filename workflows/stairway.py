@@ -129,6 +129,7 @@ class StairwayPlotRunner(object):
 
             sfs_path = ts_p+".sfs.pdf"
             # plotting masked and unmasked neutral SFSs and non neutral SFSs
+            plots.plot_sfs(SFSs, sfs_path)
             try:
                 plots.plot_sfs([allel.sfs(allel.HaplotypeArray(haps_non_neu[retain_non_neu,:]).count_alleles()[:, 1])[1:]], ts_p+".sfs.non_neutral.pdf")
             except:
