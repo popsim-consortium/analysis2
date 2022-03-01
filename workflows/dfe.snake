@@ -204,7 +204,7 @@ rule run_polydfe:
     resources: time_min=60, mem_mb=5000, cpus=1
     shell:
         """
-        {poly_dfe_exec} -d {input} -m C -i workflows/config/polyDFE/polyDFE_init_models.txt 1 -e > {output[0]}
+        {{poly_dfe_exec}} -d {input} -m C -i workflows/config/polyDFE/polyDFE_init_models.txt 1 -e > {output[0]}
         """
 
 rule get_polydfe_bestfit:
@@ -256,8 +256,8 @@ rule run_dfe_alpha:
     resources: time_min=60, mem_mb=5000, cpus=1
     shell:
         """
-        {dfe_alpha_exec} -c {input[0]} 
-        {dfe_alpha_exec} -c {input[1]}
+        {{dfe_alpha_exec}} -c {input[0]} 
+        {{dfe_alpha_exec}} -c {input[1]}
         """
 
 rule get_dfe_alpha_bestfits:
@@ -309,7 +309,7 @@ rule run_grapes:
     resources: time_min=60, mem_mb=5000, cpus=1
     shell:
         """
-        {grapes_exec} -in {input} -out {output[0]} -model GammaZero -no_div_param > {output[1]}
+        {{grapes_exec}} -in {input} -out {output[0]} -model GammaZero -no_div_param > {output[1]}
         """
 
 rule get_grapes_bestfits:
