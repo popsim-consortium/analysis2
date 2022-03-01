@@ -11,7 +11,8 @@ cd analysis2/
 
 # Set up your python environment to run the analysis
 We recommend you start by creating a new `conda` environment for the analysis. This can be done using the command below, which will
-create a new `conda` env called `analysis2`
+create a new `conda` env called `analysis2`. Currently the workflow is targeted to run on python 3.8. We believe
+there are issues when running python 3.9 or higher.
 
 ```
 conda env create -f environment.yml
