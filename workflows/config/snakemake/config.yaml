@@ -1,4 +1,4 @@
-"seed": 123
+"seed": 12345
 "population_id": 0
 "num_samples_per_population": [10, 10, 10]
 "replicates": 1
@@ -9,14 +9,13 @@
     "num_samples_per_population": [10],
     },
     {"id":"OutOfAfrica_3G09",
-    "num_samples_per_population": [10,10, 10],
+    "num_samples_per_population": [10,10,10],
     }
 ]
 "genetic_map": "HapMapII_GRCh37"
 "chrm_list": "chr21"
 "dfe_list": ["Gamma_H17"]
 "output_dir": "results"
-"mask_file": "workflows/masks/HapmapII_GRCh37.mask.bed"
 
 
 # slim settings
@@ -27,9 +26,19 @@
 "num_sampled_genomes_msmc" : [2, 8]
 "num_sampled_genomes_per_replicate": [2, 8]
 "num_msmc_iterations" : 1
-"annotation_list": ["ensembl_havana_104_exons", "none"]
+"annotation_list": ["ensembl_havana_104_exons"]
+"gone_phase" : 1 # 0 for pseudohaploid, 1 for unknown phase, 2 for phased
+"gone_max_snps" : 500 # default=50000
+"gone_threads" : 1
+"gone_num_gens" : 2000 # default=2000
+"gone_num_bins" : 400 # default=400
 
 # exe paths
 "poly_dfe_exec": "ext/polyDFE/polyDFE-2.0-linux-64-bit"
+"dfe_alpha_exec": "ext/dfe-alpha-release-2.16/est_dfe"
+"dfe_alpha_data_path_1": "ext/dfe-alpha-release-2.16/data"
+"dfe_alpha_data_path_2": "three-epoch"
+"grapes_exec": "ext/grapes/multi_grapes"
 "msmc_exec" : "ext/msmc/build/msmc"
 "stairwayplot_code" : "stairwayplot/swarmops.jar"
+"gone_code" : "GONE/Linux"
