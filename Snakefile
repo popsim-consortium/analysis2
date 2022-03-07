@@ -21,7 +21,7 @@ use rule * from simulation_workflow as simulation_*
 
 module dfe_workflow:
     snakefile:
-        "workflows/inference.snake"
+        "workflows/dfe.snake"
     config: config
 use rule * from dfe_workflow as dfe_*
 
