@@ -20,8 +20,8 @@ import stdpopsim
 import stairway
 import smc
 import msmc
+import gone
 import plots
-
 
 # ###############################################################################
 # KNOBS - 
@@ -107,7 +107,7 @@ seed_array = np.random.random_integers(1,2**31,replicates)
 genetic_map_downloaded_flag= ".genetic_map_downloaded"
 msmc_exec = config["msmc_exec"]
 stairwayplot_code = config["stairwayplot_code"]
-
+gone_code = config["gone_code"]
 try:
     mask_file = config["mask_file"]
 except KeyError:
@@ -122,6 +122,7 @@ rule all:
         annots=annotation_list,
         seeds=seed_array,
         )
+
 
 rule download_genetic_map:
     output: genetic_map_downloaded_flag
@@ -349,6 +350,105 @@ rule compound_msmc:
 
 
 # ###############################################################################
+# GONe
+# ###############################################################################
+rule gone_clone:
+    output:
+        ".gone_cloned"
+    message:
+        "cloning GONE repo"
+    threads: 20
+    shell:
+        """
+        git clone https://github.com/esrud/GONE.git
+        touch .gone_cloned
+        """
+
+
+rule gone_params:
+    input:
+        rules.gone_clone.output,
+    output:
+        ".params_edited"
+    message:
+        "specifying GONE params"
+    threads: 20
+    run:
+        prms = {"gone_phase":config["gone_phase"],
+                "gone_max_snps":config["gone_max_snps"],
+                "gone_threads":config["gone_threads"],
+                "gone_num_gens":config["gone_num_gens"],
+                "gone_num_bins":config["gone_num_bins"]}
+        gone.params(gone_code, prms)
+
+
+rule gone_copy:
+    input:
+        rules.gone_params.output,
+    output:
+        output_dir + "/inference/gone/{demog}/{dfes}/{annots}/{seeds}/{chrms}/.scripts_copied"
+    message:
+        "copying GONE scripts into individual working directories"
+    threads: 20
+    run:
+        print(output[0])
+        outpath = "/".join(output[0].split("/")[:-1])
+        gone.copy(gone_code, outpath, wildcards.seeds, threads)
+
+
+rule gone_prep_inputs:
+    input:
+        output_dir + "/simulated_data/{demog}/{dfes}/{annots}/{seeds}/sim_{chrms}.trees",
+    output:
+        output_dir + "/inference/gone/{demog}/{dfes}/{annots}/{seeds}/{chrms}/gone.ped",
+        output_dir + "/inference/gone/{demog}/{dfes}/{annots}/{seeds}/{chrms}/gone.map",
+    threads: 20
+    run:
+        genetic_map = species.get_genetic_map(genetic_map_id)
+        if not genetic_map.is_cached():
+            genetic_map.download()
+        gm_chr = genetic_map.get_chromosome_map(wildcards.chrms)
+
+        gone.ts2plink(input[0], output[0], output[1], gm_chr)
+
+
+rule gone_run:
+    input:
+        rules.gone_copy.output,
+        rules.gone_prep_inputs.output,
+    output:
+        output_dir + "/inference/gone/{demog}/{dfes}/{annots}/{seeds}/{chrms}/Output_Ne_gone",
+    threads: 20
+    shell:
+        """
+        cwd=$PWD
+        cd {output_dir}/inference/gone/{wildcards.demog}/{wildcards.dfes}/{wildcards.annots}/{wildcards.seeds}/{wildcards.chrms}
+        bash script_GONE.sh gone
+        cd $cwd
+        """
+
+def ne_files_gone(wildcards):
+    return expand(output_dir + "/inference/gone/{demog}/{dfes}/{annots}/{seeds}/{chrms}/Output_Ne_gone",
+                seeds=seed_array,
+                chrms=chrm_list,
+                dfes=wildcards.dfes,
+                demog=wildcards.demog,
+                annots=wildcards.annots,
+            )
+
+
+rule compound_gone:
+    input:
+        ne_files_gone,
+    output:
+        output_dir + "/plots/{demog}/{chrms}/{dfes}/{annots}/dfe.inference.benchmark.pdf/gone_estimated_Ne.png"
+    run: plots.plot_compound_gone(input, output[0])
+
+
+
+
+
+# ###############################################################################
 #  Plotting results
 # ###############################################################################
 
@@ -358,6 +458,7 @@ rule all_plot:
         f1 = ne_files,
         #f2 = ne_files_smcpp,
         f3 = ne_files_msmc,
+        f4 = ne_files_gone,
     output:
         output_dir + "/plots/{demog}/{chrms}/{dfes}/{annots}/all_estimated_Ne.pdf"
     run:
@@ -377,7 +478,7 @@ rule all_plot:
         num_samples_per_population = {}
         for ns, popn in zip(demo_sample_size_dict[wildcards.demog], model.populations):
             num_samples_per_population[popn.name] = ns
-        plots.plot_all_ne_estimates(input.f1, input.f3, output[0], 
+        plots.plot_all_ne_estimates(input.f1, input.f3, input.f4, output[0],
             model=model, 
             n_samp=num_samples_per_population, 
             generation_time=generation_time_helper(wildcards,species), 

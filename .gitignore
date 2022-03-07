@@ -1,8 +1,9 @@
 *.gz
 intervals/
 __pycache__
-workflows/.snakemake/*
-workflows/logs_slurm/*
 results/*
+stairwayplot/*
+ext/*/*
+logs_slurm/*
 .snakemake/*
 stairwayplot/*

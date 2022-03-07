@@ -11,7 +11,8 @@ cd analysis2/
 
 # Set up your python environment to run the analysis
 We recommend you start by creating a new `conda` environment for the analysis. This can be done using the command below, which will
-create a new `conda` env called `analysis2`
+create a new `conda` env called `analysis2`. Currently the workflow is targeted to run on python 3.8. We believe
+there are issues when running python 3.9 or higher.
 
 ```
 conda env create -f environment.yml
@@ -27,6 +28,27 @@ cat msmc_makefile_stdpopsim_patch > msmc/Makefile && cd msmc && make
 cd ../../
 ```
 
+For using `DFE-alpha`, we need to download the program and extra data (5GB) from http://www.homepages.ed.ac.uk/pkeightl/dfe_alpha/download-dfe-alpha.html
+```
+cd ext
+wget -c http://homepages.ed.ac.uk/eang33/dfe_alpha/dfe-alpha-release-2.16.tar.gz
+tar -xvf dfe-alpha-release-2.16.tar.gz
+cat dfe_alpha_makefile_stdpopsim_patch > dfe-alpha-release-2.16/Makefile && cd dfe-alpha-release-2.16 && make
+wget -c https://datashare.ed.ac.uk/bitstream/handle/10283/2730/data.tar.gz?sequence=1&isAllowed=y
+tar -xvf data.tar.gz\?sequence\=1
+cd ../../
+```
+
+For using `polyDFE` and `grapes`, we can download them from their GitHub repositories.
+```
+cd ext
+git clone https://github.com/paula-tataru/polyDFE.git
+cd polyDFE
+chmod a+x polyDFE-2.0-linux-64-bit
+wget -c https://github.com/BioPP/grapes/releases/download/v1.1.0/grapes-x86_64-bin-static-1.1.0-1.tar.gz
+tar -xvf grapes-x86_64-bin-static-1.1.0-1.tar.gz
+cd ..
+```
 
 Further instructions can be currently found in each task directory.
 A small example to simulate genomes with selection is described below.
