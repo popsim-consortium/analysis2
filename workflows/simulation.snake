@@ -92,7 +92,7 @@ rule simulation:
           ## Adding annotation only seletion on exon region
             annot = species.get_annotations(wildcards.annots)
             annot_intervals = annot.get_chromosome_annotations(wildcards.chrms)
-            contig.add_dfe(intervals=annot_intervals, DFE=dfe, logfile=output_dir+"logfile_mean_fitness.txt")
+            contig.add_dfe(intervals=annot_intervals, DFE=dfe)
         
         contig.mutation_rate = mutation_rate
         engine = stdpopsim.get_engine("slim")

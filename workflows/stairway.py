@@ -59,12 +59,12 @@ class StairwayPlotRunner(object):
             haps = ts.genotype_matrix()
 
             # Mapping mutation type IDs to class of mutation (e.g., neutral, non-neutral)
-            mut_types = {}
+            class_muts = {}
             for dfe in ts.metadata["stdpopsim"]["DFEs"]:
                 for mt in dfe["mutation_types"]:
                     mid = mt["slim_mutation_type_id"]
-                    if not mid in mut_types:
-                        mut_types[mid] = "neutral" if mt["is_neutral"] else "non_neutral"
+                    if not mid in class_muts:
+                        class_muts[mid] = "neutral" if mt["is_neutral"] else "non_neutral"
 
             site_class = np.empty(ts.num_sites, dtype=object)
 
@@ -72,15 +72,15 @@ class StairwayPlotRunner(object):
             neu_positions = []
             non_neu_positions = []
             for j, s in enumerate(ts.sites()):
-                mt = []
+                mut_hits = []
                 for m in s.mutations:
                     for md in m.metadata["mutation_list"]:
-                        mt.append(md["mutation_type"])
-                        if set(mut_types[md["mutation_type"]]) == set("neutral"):
+                        mut_hits.append(md["mutation_type"])
+                        if set(class_muts[md["mutation_type"]]) == set("neutral"):
                             neu_positions.append(m.site)
-                        if set(mut_types[md["mutation_type"]]) == set("non_neutral"):
+                        if set(class_muts[md["mutation_type"]]) == set("non_neutral"):
                             non_neu_positions.append(m.site)
-                site_class[j] = mut_types[mt[0]] if len(mt) == 1 else "double_hit" 
+                site_class[j] = class_muts[mut_hits[0]] if len(mut_hits) == 1 else "double_hit" 
             assert sum(site_class == None) == 0
 
             # All SNP locs
@@ -90,7 +90,7 @@ class StairwayPlotRunner(object):
 
             SFSs = []
 
-            # Make it work, get ride off neutral positions that overlap the mask region
+            # Getting ride of the neutral positions that overlap with the mask region
             retain = np.full(len(neu_positions), True)
             retain_non_neu = np.full(len(non_neu_positions), True)
             if mask_file:
@@ -109,31 +109,30 @@ class StairwayPlotRunner(object):
                         retain_non_neu[i] = False
                 total_length -= np.sum(mask_ints.length)
 
-            neu_positions = list(neu_positions)
-
             # Extract neutral positions haplotypes
             haps_neu = haps[neu_positions,:]
-            haps_non_neu = haps[non_neu_positions,:]            
+            haps_non_neu = haps[non_neu_positions,:]         
 
             # append unmasked neutral SFS
             SFSs.append(allel.sfs(allel.HaplotypeArray(haps_neu).count_alleles()[:, 1])[1:])
-            print(allel.sfs(allel.HaplotypeArray(haps_neu).count_alleles()[:, 1])[1:].shape)
 
             allele_counts = allel.HaplotypeArray(haps_neu).count_alleles()
             # get masked allele counts and append SFS
             allele_counts = allel.HaplotypeArray(haps_neu[retain,:]).count_alleles()
+            print(allele_counts)
 
             # append masked neutral SFS
             SFSs.append(allel.sfs(allele_counts[:, 1])[1:])
-            # append masked non neutral SFS
-
             sfs_path = ts_p+".sfs.pdf"
+
             # plotting masked and unmasked neutral SFSs and non neutral SFSs
             plots.plot_sfs(SFSs, sfs_path)
-            try:
-                plots.plot_sfs([allel.sfs(allel.HaplotypeArray(haps_non_neu[retain_non_neu,:]).count_alleles()[:, 1])[1:]], ts_p+".sfs.non_neutral.pdf")
+            try: 
+                plots.plot_sfs([allel.sfs(allel.HaplotypeArray(haps_non_neu[retain_non_neu,:]).count_alleles()[:, 1])[1:]], ts_p + ".sfs.non_neutral.pdf")
             except:
+                print("Only neutral mutations are observed")
                 continue
+            
             # Bootstrap allele counts
             derived_counts_all[0].extend(allele_counts[:, 1])
             for j in range(1, num_bootstraps + 1):
@@ -146,12 +145,12 @@ class StairwayPlotRunner(object):
         # Get the SFS minus the 0 bin and write output
         stairway_files = []
         for l in range(len(derived_counts_all)):
+            print(l)
             sfs = allel.sfs(derived_counts_all[l])[1:]
             filename = self.workdir / f"sfs_{l}_.txt"
             write_stairway_sfs(total_length, num_samples, sfs, filename)
             stairway_files.append(filename)
 
-        print(stairway_files)
         return stairway_files
 
 
