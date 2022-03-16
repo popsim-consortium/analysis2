@@ -316,8 +316,6 @@ rule run_msmc:
                         )
         input_file_string = " ".join(inputs)
         output_file_string = output_dir + f"/inference/smc/{wildcards.demog}/{wildcards.dfes}/{wildcards.annots}/{wildcards.seeds}/{wildcards.samps}.{wildcards.chrms}.trees.multihep.txt"
-        print("This is the string")
-        print(output_file_string)
         msmc.run_msmc_estimate(input_file_string, output_file_string, msmc_exec,
             iterations=num_msmc_iterations, ncores=threads)
 
