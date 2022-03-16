@@ -31,6 +31,24 @@ def write_stairway_sfs(sequence_length, num_samples, sfs, path):
             print(int(x), end="\t", file=out)
         print(file=out)
 
+def mask_positions(mask_file, ts_p, snp_pos):
+    """
+    Mask positions that overlap the mask file
+    """
+    retain = np.full(len(snp_pos), True)
+    total_length = 0
+    mask_table = pd.read_csv(mask_file, sep="\t", header=None)
+    chrom = ts_p.split("/")[-1].split(".")[0]
+    chrom = chrom.split("sim_")[1]
+    sub = mask_table[mask_table[0] == chrom]
+    mask_ints = pd.IntervalIndex.from_arrays(sub[1], sub[2])
+    tmp_bool = [mask_ints.contains(x) for x in snp_pos]
+    for i in range(len(tmp_bool)):
+        if sum(tmp_bool[i]) > 0:
+            retain[i] = False    
+    total_length -= np.sum(mask_ints.length)
+    return([retain, total_length])
+
 
 class StairwayPlotRunner(object):
     """
@@ -94,20 +112,8 @@ class StairwayPlotRunner(object):
             retain = np.full(len(neu_positions), True)
             retain_non_neu = np.full(len(non_neu_positions), True)
             if mask_file:
-                mask_table = pd.read_csv(mask_file, sep="\t", header=None)
-                chrom = ts_p.split("/")[-1].split(".")[0]
-                chrom = chrom.split("sim_")[1]
-                sub = mask_table[mask_table[0] == chrom]
-                mask_ints = pd.IntervalIndex.from_arrays(sub[1], sub[2])
-                tmp_bool_neu = [mask_ints.contains(x) for x in snp_locs]
-                tmp_bool_n_neu = [mask_ints.contains(x) for x in snp_locs_non_neutral]
-                for i in range(len(tmp_bool_neu)):
-                    if sum(tmp_bool_neu[i]) > 0:
-                        retain[i] = False
-                for i in range(len(tmp_bool_n_neu)):
-                    if sum(tmp_bool_n_neu[i]) > 0:
-                        retain_non_neu[i] = False
-                total_length -= np.sum(mask_ints.length)
+                retain, total_length = mask_positions(mask_file, ts_p, snp_locs)
+                retain_non_neu, total_length = mask_positions(mask_file, ts_p, snp_locs_non_neutral)
 
             # Extract neutral positions haplotypes
             haps_neu = haps[neu_positions,:]
@@ -115,11 +121,10 @@ class StairwayPlotRunner(object):
 
             # append unmasked neutral SFS
             SFSs.append(allel.sfs(allel.HaplotypeArray(haps_neu).count_alleles()[:, 1])[1:])
-
             allele_counts = allel.HaplotypeArray(haps_neu).count_alleles()
-            # get masked allele counts and append SFS
+
+            # get masked allele counts and append neutral masked SFS
             allele_counts = allel.HaplotypeArray(haps_neu[retain,:]).count_alleles()
-            print(allele_counts)
 
             # append masked neutral SFS
             SFSs.append(allel.sfs(allele_counts[:, 1])[1:])
@@ -133,7 +138,7 @@ class StairwayPlotRunner(object):
                 print("Only neutral mutations are observed")
                 continue
             
-            # Bootstrap allele counts
+            # Bootstrap allele counts (neutral)
             derived_counts_all[0].extend(allele_counts[:, 1])
             for j in range(1, num_bootstraps + 1):
                 nsites = np.shape(allele_counts)[0]
@@ -145,7 +150,6 @@ class StairwayPlotRunner(object):
         # Get the SFS minus the 0 bin and write output
         stairway_files = []
         for l in range(len(derived_counts_all)):
-            print(l)
             sfs = allel.sfs(derived_counts_all[l])[1:]
             filename = self.workdir / f"sfs_{l}_.txt"
             write_stairway_sfs(total_length, num_samples, sfs, filename)
@@ -161,12 +165,9 @@ class StairwayPlotRunner(object):
         """
         num_runs = 1
         dim_factor = 5000
-        # print("This is the input file")
-        # print(input_file)
         cmd = (
             f"{self.java_exe} -cp {self.classpath} Stairway_plot_theta_estimation02 "
             f"{input_file} {num_runs} {dim_factor}")
-        print(cmd)
         logging.info("Running:" + cmd)
         subprocess.run(cmd, shell=True, check=True)
 
