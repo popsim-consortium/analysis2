@@ -1,6 +1,7 @@
 name: analysis2
 channels:
   - conda-forge
+  - bioconda
 dependencies:
   - python==3.8
   - pip
@@ -17,6 +18,7 @@ dependencies:
   - cython
   - tqdm
   - h5py
+  - gfortran
   - blas
   - gsl
   - dadi
