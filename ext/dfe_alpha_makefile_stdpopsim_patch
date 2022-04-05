@@ -1,7 +1,5 @@
-GSLDIR = ${CONDA_PREFIX}
-
-CC        = gcc
-CFLAGS   += -lm -lgsl -lgslcblas -O4 -fcommon -I${GSLDIR}/include -L${GSLDIR}/lib 
+CC        = ${CONDA_PREFIX}/bingcc
+CFLAGS   += -lm -lgsl -lgslcblas -O4 -fcommon -I${CONDA_PREFIX}/include -L${CONDA_PREFIX}/lib 
 
 all: est_dfe est_alpha_omega prop_muts_in_s_ranges
        
