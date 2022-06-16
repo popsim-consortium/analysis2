@@ -3,7 +3,7 @@ intervals/
 __pycache__
 results/*
 stairwayplot/*
-ext/*/*
+ext/*/
 logs_slurm/*
 .snakemake/*
 stairwayplot/*

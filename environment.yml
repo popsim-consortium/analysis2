@@ -3,7 +3,10 @@ channels:
   - conda-forge
   - bioconda
 dependencies:
-  - python==3.8
+  - gcc
+  - gmp
+  - gxx
+  - mpfr
   - pip
   - slim==3.7.1
   - snakemake
