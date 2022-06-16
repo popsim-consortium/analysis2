@@ -1,3 +1,5 @@
+[![build Status](https://github.com/popsim-consortium/analysis2/actions/workflows/dry-run.yml/badge.svg?branch=main)](https://github.com/popsim-consortium/analysis2/actions)
+
 # Analysis 2
 Analysis of inference methods on standard population models including selection.
 Here's how to get going, if you'd like to run this analysis
