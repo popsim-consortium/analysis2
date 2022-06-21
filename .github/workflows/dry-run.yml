@@ -20,7 +20,7 @@ jobs:
         conda update -n base -c defaults conda
         conda config --set safety_checks disabled
         conda config --set channel_priority strict
-        conda env update --file environment.yml --name base
+        conda env create -f environment.yml
     - name: Test dry-run
       run: |
-        snakemake -np --use-conda --conda-frontend conda
+        conda run -n analysis2 snakemake -np --use-conda --conda-frontend conda
