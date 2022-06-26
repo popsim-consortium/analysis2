@@ -1,3 +1,5 @@
+[![build Status](https://github.com/popsim-consortium/analysis2/actions/workflows/dry-run.yml/badge.svg?branch=main)](https://github.com/popsim-consortium/analysis2/actions)
+
 # Analysis 2
 Analysis of inference methods on standard population models including selection.
 Here's how to get going, if you'd like to run this analysis
@@ -28,10 +30,22 @@ cat msmc_makefile_stdpopsim_patch > msmc/Makefile && cd msmc && make
 cd ../../
 ```
 
+For using `smc++` we need to download and build it.
+```
+cd ext
+git clone https://github.com/popgenmethods/smcpp
+cat smc_setup_stdpopsim_patch > smcpp/setup.py
+cat smc_pyproject_stdpopsim_patch > smcpp/pyproject.toml
+cd smcpp
+pip install .
+cd ../../
+```
+
 For using `DFE-alpha`, we need to download the program and extra data (5GB) from http://www.homepages.ed.ac.uk/pkeightl/dfe_alpha/download-dfe-alpha.html
 ```
 cd ext
-wget -c http://homepages.ed.ac.uk/eang33/dfe_alpha/dfe-alpha-release-2.16.tar.gz
+wget -c https://sourceforge.net/projects/dfe-alpha-k-e-w/files/dfe-alpha-release-2.16.tar.gz/download
+mv download dfe-alpha-release-2.16.tar.gz
 tar -xvf dfe-alpha-release-2.16.tar.gz
 cat dfe_alpha_makefile_stdpopsim_patch > dfe-alpha-release-2.16/Makefile && cd dfe-alpha-release-2.16 && make
 wget -c https://datashare.ed.ac.uk/bitstream/handle/10283/2730/data.tar.gz?sequence=1&isAllowed=y
