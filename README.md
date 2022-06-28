@@ -23,12 +23,32 @@ conda activate analysis2
 
 For using `msmc` we need to download and compile it to play nice
 with the conda environment that we have set up.
+Also, we need DMD and GSL.
 ```
 cd ext
-git clone https://github.com/stschiff/msmc.git
-cat msmc_makefile_stdpopsim_patch > msmc/Makefile && cd msmc && make
+    # GSL
+wget https://ftp.gnu.org/gnu/gsl/gsl-2.7.tar.gz
+tar -xzf gsl-2.7.tar.gz 
+cd gsl-2.7
+./configure --prefix=$PWD
+make
+make install
+cd ../
+    # DMD
+wget https://s3.us-west-2.amazonaws.com/downloads.dlang.org/releases/2022/dmd.2.100.0.linux.tar.xz
+tar -xf dmd.2.100.0.linux.tar.xz 
+    # MSMC2
+git clone https://github.com/stschiff/msmc2.git
+gsl_path=$(echo $PWD/gsl-2.7/lib/ | sed s/"\/"/'\\\/'/g)
+dmd_path=$(echo $PWD/dmd2/linux/bin64/dmd | sed s/"\/"/'\\\/'/g)
+cd msmc2
+mv Makefile Makefile_og
+cat Makefile_og | sed s/dmd/$dmd_path/g | sed s/"\/usr\/local\/lib"/$gsl_path/g > Makefile
+make
+    #
 cd ../../
 ```
+
 
 For using `smc++` we need to download and build it.
 ```
