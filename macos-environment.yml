@@ -1,0 +1,30 @@
+name: analysis2
+channels:
+  - conda-forge
+  - bioconda
+dependencies:
+  - clang_osx-64
+  - gmp
+  - clangxx_osx-64
+  - mpfr
+  - pip
+  - slim==3.7.1
+  - snakemake
+  - ldc
+  - seaborn
+  - pysam
+  - htslib
+  - scipy
+  - numpy
+  - matplotlib
+  - attrs
+  - cython
+  - tqdm
+  - h5py
+  - gfortran_osx-64
+  - blas
+  - gsl
+  - dadi
+  - pip:
+    - git+https://github.com/popsim-consortium/stdpopsim.git
+    - scikit-allel

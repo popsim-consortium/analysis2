@@ -1,0 +1,50 @@
+name: dry-run
+
+on: ['push', 'pull_request']
+
+jobs:
+  build:
+    runs-on: macos-latest
+    
+    steps:
+    - uses: actions/checkout@v3
+    - name: Set up Python 3.10
+      uses: actions/setup-python@v3
+      with:
+        python-version: "3.10"
+    - name: Add micromamba to system path
+      uses: mamba-org/provision-with-micromamba@main
+      with:
+        environment-name: analysis2
+        activate-environment: analysis2
+        environment-file: environment.yml
+    - name: Install DFE-alpha
+      run: |
+        cd ext
+        wget -c https://sourceforge.net/projects/dfe-alpha-k-e-w/files/dfe-alpha-release-2.16.tar.gz/download
+        mv download dfe-alpha-release-2.16.tar.gz
+        tar -xvf dfe-alpha-release-2.16.tar.gz
+        cat dfe_alpha_makefile_stdpopsim_patch > dfe-alpha-release-2.16/Makefile
+        cd dfe-alpha-release-2.16
+        micromamba run -n analysis2 make
+        cd ../../
+    - name: Install msmc
+      run: |
+        cd ext
+        git clone https://github.com/stschiff/msmc.git
+        cat msmc_makefile_stdpopsim_patch > msmc/Makefile 
+        cd msmc 
+        micromamba run -n analysis2 make
+        cd ../../
+    - name: Install smc++
+      run: |
+        cd ext
+        git clone https://github.com/popgenmethods/smcpp
+        cat smc_setup_stdpopsim_patch > smcpp/setup.py
+        cat smc_pyproject_stdpopsim_patch > smcpp/pyproject.toml
+        cd smcpp
+        micromamba run -n analysis2 pip install .
+        cd ../../
+    - name: Test dry-run
+      run: |
+        micromamba run -n analysis2 snakemake -np --use-conda --conda-frontend conda
