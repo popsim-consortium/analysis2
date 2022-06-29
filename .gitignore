@@ -5,5 +5,10 @@ results/*
 stairwayplot/*
 ext/*/
 logs_slurm/*
-.snakemake/*
+.snakemake
+.snakemake.json
+.snakemake/log/*
 stairwayplot/*
+workflows/.snakemake/*
+
+
