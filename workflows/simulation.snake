@@ -22,11 +22,6 @@ output_dir = os.path.abspath(config["output_dir"])
 # The analysis species
 species = stdpopsim.get_species(config["species"])
 
-# The number of samples to simulate for within each population
-num_samples_per_population = config["num_samples_per_population"]
-sample_sizes = dict()
-for i in range(len(num_samples_per_population)):
-    sample_sizes[str(i)] = num_samples_per_population[i]
 
 # The names of all chromosomes to simulate, separated by commas
 # Use "all" to simulate all chromsomes for the genome

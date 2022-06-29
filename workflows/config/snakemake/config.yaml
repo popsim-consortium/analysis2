@@ -23,8 +23,8 @@
 "slim_burn_in": 10
 
 # n(t) specific configs
-"num_sampled_genomes_msmc" : [2, 8]
-"num_sampled_genomes_per_replicate": [2, 8]
+"num_sampled_genomes_msmc" : [2]
+"num_sampled_genomes_per_replicate": [2]
 "num_msmc_iterations" : 1
 "annotation_list": ["ensembl_havana_104_exons"]
 "gone_phase" : 1 # 0 for pseudohaploid, 1 for unknown phase, 2 for phased
@@ -40,5 +40,5 @@
 "dfe_alpha_data_path_2": "three-epoch"
 "grapes_exec": "ext/grapes/multi_grapes"
 "msmc_exec" : "ext/msmc/build/msmc"
-"stairwayplot_code" : "stairwayplot/swarmops.jar"
-"gone_code" : "GONE/Linux"
+"stairwayplot_code" : "ext/stairwayplot/swarmops.jar"
+"gone_code" : "ext/GONE/Linux"

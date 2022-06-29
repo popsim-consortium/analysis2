@@ -12,5 +12,6 @@ tqdm
 h5py
 blas
 gsl
+scikit-learn
 dadi
 slim=3.7.1
