@@ -173,10 +173,23 @@ rule get_dadi_dfe_bestfits:
 # ###############################################################################
 # polyDFE
 # ###############################################################################
+rule download_polydfe:
+    message:
+        "Download polyDFE"
+    output:
+        "ext/polyDFE/polyDFE-2.0-linux-64-bit"
+    shell:
+        """
+        cd ext
+        git clone https://github.com/paula-tataru/polyDFE.git
+        cd polyDFE
+        chmod a+x polyDFE-2.0-linux-64-bit
+        cd ..
+        """
 
 rule generate_polydfe_fs:
     input:
-        output_dir + "/simulated_data/{demog}/{dfes}/{annots}/{seeds}/sim_{chrms}.trees"
+        output_dir + "/simulated_data/{demog}/{dfes}/{annots}/{seeds}/sim_{chrms}.trees",
     output:
         output_dir + "/inference/{demog}/polyDFE/{dfes}/{annots}/{seeds}/{chrms}/pop{ids}/pop{ids}.polyDFE.fs"
     threads: 1
@@ -197,14 +210,17 @@ rule generate_polydfe_fs:
 
 rule run_polydfe:
     input: 
-        rules.generate_polydfe_fs.output
+        rules.generate_polydfe_fs.output,
+        rules.download_polydfe.output,
     output: 
         output_dir + "/inference/{demog}/polyDFE/{dfes}/{annots}/{seeds}/{chrms}/pop{ids}/pop{ids}.polyDFE.out"
     threads: 1
     resources: time_min=60, mem_mb=5000, cpus=1
+    params:
+        exec=poly_dfe_exec
     shell:
         """
-        {{poly_dfe_exec}} -d {input} -m C -i workflows/config/polyDFE/polyDFE_init_models.txt 1 -e > {output[0]}
+        '{params.exec}' -d {input} -m C -i workflows/config/polyDFE/polyDFE_init_models.txt 1 -e > {output[0]}
         """
 
 rule get_polydfe_bestfit:
@@ -226,9 +242,32 @@ rule get_polydfe_bestfit:
 # DFE-alpha
 # ###############################################################################
 
+rule download_dfe_alpha:
+    message: 
+        "Downloaded DFE-alpha"
+    output:
+        "ext/dfe-alpha-release-2.16/est_dfe",
+        "ext/dfe-alpha-release-2.16/data/n1_100/s_evaluated.dat"
+
+    shell:
+        """
+        cd ext
+        wget -c https://sourceforge.net/projects/dfe-alpha-k-e-w/files/dfe-alpha-release-2.16.tar.gz/download
+        mv download dfe-alpha-release-2.16.tar.gz
+        tar -xvf dfe-alpha-release-2.16.tar.gz
+        cat dfe_alpha_makefile_stdpopsim_patch > dfe-alpha-release-2.16/Makefile && cd dfe-alpha-release-2.16 && make
+        wget http://sesame.uoregon.edu/~adkern/stdpopsim/data.tar.gz && tar -xvf data.tar.gz && rm -f data.tar.gz
+        # old location of above
+        #  https://datashare.ed.ac.uk/bitstream/handle/10283/2730/data.tar.gz?sequence=1&isAllowed=y
+        cd ../
+        rm dfe-alpha-release-2.16.tar.gz
+        cd ../
+        """
+        
 rule generate_dfe_alpha_fs:
     input:
-        output_dir + "/simulated_data/{demog}/{dfes}/{annots}/{seeds}/sim_{chrms}.trees"
+        output_dir + "/simulated_data/{demog}/{dfes}/{annots}/{seeds}/sim_{chrms}.trees",
+        rules.download_dfe_alpha.output,
     output:
         output_dir + "/inference/{demog}/DFE-alpha/{dfes}/{annots}/{seeds}/{chrms}/pop{ids}/pop{ids}.DFE-alpha.neu.config",
         output_dir + "/inference/{demog}/DFE-alpha/{dfes}/{annots}/{seeds}/{chrms}/pop{ids}/pop{ids}.DFE-alpha.nonneu.config",
@@ -239,8 +278,10 @@ rule generate_dfe_alpha_fs:
     resources: time_min=60, mem_mb=5000, cpus=1
     run:
         contig = species.get_contig(wildcards.chrms)
+        print(input[0], file=sys.stderr, flush=True)
 
         ts = tskit.load(input[0])
+
         index = int(wildcards.ids)
         samps = ts.samples(population=index)
         if len(samps) == 0: samps = ts.samples(population=0)
@@ -252,12 +293,14 @@ rule run_dfe_alpha:
         rules.generate_dfe_alpha_fs.output
     output:
         output_dir + "/inference/{demog}/DFE-alpha/{dfes}/{annots}/{seeds}/{chrms}/pop{ids}/nonneu/est_dfe.out"
+    params:
+        exec=dfe_alpha_exec
     threads: 1
     resources: time_min=60, mem_mb=5000, cpus=1
     shell:
         """
-        {{dfe_alpha_exec}} -c {input[0]} 
-        {{dfe_alpha_exec}} -c {input[1]}
+        '{params.exec}' -c {input[0]} 
+        '{params.exec}' -c {input[1]}
         """
 
 rule get_dfe_alpha_bestfits:
@@ -276,8 +319,24 @@ rule get_dfe_alpha_bestfits:
 # grapes
 # ###############################################################################
 
+rule download_grapes:
+    output:
+        "ext/grapes/multi_grapes"
+    threads: 1
+    message: "Downloading grapes"
+    resources: time_min=60, mem_mb=5000, cpus=1
+    shell:
+        """
+        cd ext/
+        wget -c https://github.com/BioPP/grapes/releases/download/v1.1.0/grapes-x86_64-bin-static-1.1.0-1.tar.gz
+        tar -xvf grapes-x86_64-bin-static-1.1.0-1.tar.gz 
+        rm -f grapes-x86_64-bin-static-1.1.0-1.tar.gz
+        cd ..       
+        """
+
 rule generate_grapes_fs:
     input:
+        rules.download_grapes.output,
         output_dir + "/simulated_data/{demog}/{dfes}/{annots}/{seeds}/sim_{chrms}.trees"
     output:
         output_dir + "/inference/{demog}/grapes/{dfes}/{annots}/{seeds}/{chrms}/pop{ids}/pop{ids}.grapes.fs"        
@@ -289,7 +348,7 @@ rule generate_grapes_fs:
         neu_prop = 0.3
         nonneu_prop = 0.7
 
-        ts = tskit.load(input[0])
+        ts = tskit.load(input[1])
         index = int(wildcards.ids)
         samps = ts.samples(population=index)
         if len(samps) == 0: samps = ts.samples(population=0)
@@ -305,11 +364,13 @@ rule run_grapes:
     output:
         output_dir + "/inference/{demog}/grapes/{dfes}/{annots}/{seeds}/{chrms}/pop{ids}/pop{ids}.grapes.ept.fs",
         output_dir + "/inference/{demog}/grapes/{dfes}/{annots}/{seeds}/{chrms}/pop{ids}/pop{ids}.grapes.out"
+    params:
+        exec=grapes_exec
     threads: 1
     resources: time_min=60, mem_mb=5000, cpus=1
     shell:
         """
-        {{grapes_exec}} -in {input} -out {output[0]} -model GammaZero -no_div_param > {output[1]}
+        '{params.exec}' -in {input} -out {output[0]} -model GammaZero -no_div_param > {output[1]}
         """
 
 rule get_grapes_bestfits:

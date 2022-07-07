@@ -41,7 +41,6 @@ species = stdpopsim.get_species(config["species"])
 # This is the number of samples to simulate for within each population
 # for each replicate
 # TODO double check this is up to date with stdpopsim backend 
-num_samples_per_population = config["num_samples_per_population"]
 population_id = config["population_id"]
 
 # Here is a list of sample sizes to run msmc on. 
@@ -156,19 +155,23 @@ def generation_time_helper(wildcards, species):
 
 rule sp_download:
     output: 
-        stairwayplot_code
+        directory("ext/stairwayplot")
     message: 
         "downloading stairwayplot"
-    threads: 20
+    threads: 1
     shell:
-        "wget http://sesame.uoregon.edu/~adkern/stdpopsim/stairwayplot.tar.gz && \
-            tar zxf stairwayplot.tar.gz"
-
+        """
+        cd ext/
+        wget http://sesame.uoregon.edu/~adkern/stdpopsim/stairwayplot.tar.gz
+        tar zxf stairwayplot.tar.gz
+        rm -f stairwayplot.tar.gz
+        cd ../
+        """
 
 rule run_stairwayplot:
     input:
         output_dir + "/simulated_data/{demog}/{dfes}/{annots}/{seeds}/sim_{chrms}.trees",
-        stairwayplot_code,
+        rules.sp_download.output,
     output: output_dir + "/inference/sp/{demog}/{dfes}/{annots}/{seeds}/{chrms}/stairwayplot_estimated_Ne.txt"
     threads: 20
     run:
@@ -183,7 +186,7 @@ rule run_stairwayplot:
         runner = stairway.StairwayPlotRunner(
             workdir=output_dir + "/inference/" + wildcards.demog + "/" + wildcards.dfes + "/" +
                 wildcards.annots + "/" + wildcards.seeds + "/",
-            stairway_dir=pathlib.Path.cwd() / "stairwayplot")
+            stairway_dir=pathlib.Path.cwd() / "ext/stairwayplot")
         runner.ts_to_stairway(inputs, num_bootstraps=200, mask_file=mask_file)
         runner.run_theta_estimation(max_workers=threads, show_progress=True)
         runner.run_summary(output, mutation_rate=mutation_rate, generation_time=generation_time_helper(wildcards,species))
@@ -228,6 +231,21 @@ rule plot_stairwayplot:
 # SMC++
 # ###############################################################################
 
+rule clone_smcpp:
+    output:
+        "ext/smcpp/pyproject.toml"
+    message: "Cloning SMC++"
+    threads: 1
+    shell:
+        """
+        cd ext/
+        git clone https://github.com/popgenmethods/smcpp.git
+        cat smc_setup_stdpopsim_patch > smcpp/setup.py
+        cat smc_pyproject_stdpopsim_patch > smcpp/pyproject.toml
+        cd smcpp/
+        pip install .
+        cd ..
+        """
 
 rule ts_to_smc:
     input: output_dir + "/simulated_data/{demog}/{dfes}/{annots}/{seeds}/sim_{chrms}.trees"
@@ -237,7 +255,8 @@ rule ts_to_smc:
 
 rule run_smcpp:
     input:
-        output_dir+ "/inference/smc/{demog}/{dfes}/{annots}/{seeds}/sim_{chrms}.trees.smc.gz", 
+        output_dir+ "/inference/smc/{demog}/{dfes}/{annots}/{seeds}/sim_{chrms}.trees.smc.gz",
+        rules.clone_smcpp.output, 
     output:
         output_dir + "/inference/smc/{demog}/{dfes}/{annots}/{seeds}/sim_{chrms}.trees.smc.gz.final.json"
     threads: 20
@@ -278,6 +297,20 @@ rule compound_smcpp:
 # MSMC
 # ###############################################################################
 
+rule download_msmc:
+    output: 
+        directory("ext/msmc")
+    message: 
+        "downloading msmc"
+    threads: 1
+    shell:
+        """
+        cd ext
+        git clone https://github.com/stschiff/msmc.git
+        cat msmc_makefile_stdpopsim_patch > msmc/Makefile && cd msmc && make
+        cd ../../
+        """
+
 rule ts_to_multihep:
     input: output_dir + "/simulated_data/{demog}/{dfes}/{annots}/{seeds}/sim_{chrms}.trees"
     output: output_dir + "/inference/smc/{demog}/{dfes}/{annots}/{seeds}/{samps}.{chrms}.trees.multihep.txt"
@@ -292,7 +325,8 @@ rule run_msmc:
         # is there anyway to get access to wildcards.seeds from here? 
         #expand(output_dir + "/Intermediate/{seeds}/{samps}.{chrms}_{selection}.trees.multihep.txt",
         #    chrms=chrm_list, seeds=seed_array, samps=num_sampled_genomes_msmc, selection=selection)
-        rules.ts_to_multihep.output
+        rules.ts_to_multihep.output,
+        rules.download_msmc.output
     output: output_dir + "/inference/smc/{demog}/{dfes}/{annots}/{seeds}/{samps}.{chrms}.trees.multihep.txt.final.txt"
     threads: 8 
     run: 
@@ -344,14 +378,15 @@ rule compound_msmc:
 # ###############################################################################
 rule gone_clone:
     output:
-        ".gone_cloned"
+        directory("ext/GONE")
     message:
         "cloning GONE repo"
     threads: 20
     shell:
         """
+        cd ext/
         git clone https://github.com/esrud/GONE.git
-        touch .gone_cloned
+        cd ..
         """
 
 
@@ -375,6 +410,8 @@ rule gone_params:
 rule gone_copy:
     input:
         rules.gone_params.output,
+        rules.gone_clone.output,
+
     output:
         output_dir + "/inference/gone/{demog}/{dfes}/{annots}/{seeds}/{chrms}/.scripts_copied"
     message:
@@ -445,10 +482,10 @@ rule compound_gone:
 
 rule all_plot:
     input:
-        f1 = ne_files,
+        f1=ne_files,
         #f2 = ne_files_smcpp,
-        f3 = ne_files_msmc,
-        f4 = ne_files_gone,
+        f3=ne_files_msmc,
+        f4=ne_files_gone,
     output:
         output_dir + "/plots/{demog}/{chrms}/{dfes}/{annots}/all_estimated_Ne.pdf"
     run:
@@ -464,7 +501,6 @@ rule all_plot:
             model = species.get_demographic_model(wildcards.demog)
         # build dict for population labels / sample sizes?
         # num_samples_per_population = {'YRI':20, 'CEU':0, 'CHB':0}
-       
         num_samples_per_population = {}
         for ns, popn in zip(demo_sample_size_dict[wildcards.demog], model.populations):
             num_samples_per_population[popn.name] = ns
