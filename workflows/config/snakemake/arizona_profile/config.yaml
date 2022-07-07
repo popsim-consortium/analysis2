@@ -1,0 +1,28 @@
+cluster: 
+        sbatch
+                --partition=high_priority
+                --account=rgutenk
+                --cpus-per-task={threads}
+                --mem-per-cpu={resources.mem_mb}
+                --time={resources.time}
+                --job-name=smk-{rule}-{wildcards}
+                -o logs_slurm/{rule}_{wildcards} 
+                -e logs_slurm/{rule}_{wildcards} 
+                --mail-type=FAIL 
+                --export=ALL,LD_LIBRARY_PATH=/xdisk/rgutenk/xinhuang/software/gsl-2.7/build/lib/
+
+default-resources:
+        - time=60
+        - mem_mb=5000
+        - threads=1
+latency-wait: 180
+restart-times: 3
+max-jobs-per-second: 10
+max-status-checks-per-second: 1
+local-cores: 1
+jobs: 500
+keep-going: True
+rerun-incomplete: True
+printshellcmds: True
+scheduler: greedy
+use-conda: True
