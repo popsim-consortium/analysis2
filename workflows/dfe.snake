@@ -79,8 +79,6 @@ rule generate_dadi_fs:
     output:
         output_dir + "/inference/{demog}/dadi/{dfes}/{annots}/{seeds}/{chrms}/pop{ids}/pop{ids}.dadi.neu.fs",
         output_dir + "/inference/{demog}/dadi/{dfes}/{annots}/{seeds}/{chrms}/pop{ids}/pop{ids}.dadi.nonneu.fs"
-    threads: 1
-    resources: time_min=60, mem_mb=5000, cpus=1
     run:
         contig = species.get_contig(wildcards.chrms)
         seq_len = contig.recombination_map.sequence_length
@@ -108,7 +106,6 @@ rule dadi_infer_dm:
         opts = 100,
         prefix = output_dir + "/inference/{demog}/dadi/{dfes}/{annots}/{seeds}/{chrms}/pop{ids}/pop{ids}.two_epoch"
     threads: 8
-    resources: time_min=60, mem_mb=5000, cpus=8
     shell:
         """
         dadi-cli InferDM --fs {input} --model {params.demog} --p0 {params.demog_p0} --ubounds {params.demog_ubounds} --lbounds {params.demog_lbounds} --output-prefix {params.prefix} --optimizations {params.opts} --grids {params.grid_size} --threads {threads}
@@ -127,7 +124,6 @@ rule dadi_generate_cache:
         grid_size = '800 1000 1200',
         gamma_pts = 2000
     threads: 8
-    resources: time_min=60, mem_mb=5000, cpus=8
     shell:
         """
         dadi-cli GenerateCache --model {params.demog} --demo-popt {input} --sample-size {params.sample_size} --output {output} --mp --grids {params.grid_size} --gamma-pts {params.gamma_pts}
@@ -150,7 +146,6 @@ rule dadi_infer_dfe:
         opts = 100,
         prefix = output_dir + "/inference/{demog}/dadi/{dfes}/{annots}/{seeds}/{chrms}/pop{ids}/pop{ids}.two_epoch.gamma"
     threads: 8
-    resources: time_min=60, mem_mb=5000, cpus=8
     shell:
         """
         dadi-cli InferDFE --fs {input[0]} --cache1d {input[1]} --demo-popt {input[2]} --output-prefix {params.prefix} --pdf1d {params.dfe} --p0 {params.dfe_p0} --ubounds {params.dfe_ubounds} --lbounds {params.dfe_lbounds} --ratio {params.ratio} --optimizations {params.opts} --threads {threads}
@@ -163,8 +158,6 @@ rule get_dadi_dfe_bestfits:
         rules.dadi_infer_dfe.output
     output:
         output_dir + "/inference/{demog}/dadi/{dfes}/{annots}/{seeds}/{chrms}/pop{ids}/pop{ids}.dadi.bestfit"
-    threads: 1
-    resources: time_min=60, mem_mb=5000, cpus=1
     shell:
         """
         grep 'Converged results' {input} -A 2 | tail -1 | awk -v id={wildcards.ids} '{{print "pop"id"\\t"$0}}' | sed '1ipop_id\\tlikelihood\\tshape\\tscale\\ttheta' > {output}
@@ -192,8 +185,6 @@ rule generate_polydfe_fs:
         output_dir + "/simulated_data/{demog}/{dfes}/{annots}/{seeds}/sim_{chrms}.trees",
     output:
         output_dir + "/inference/{demog}/polyDFE/{dfes}/{annots}/{seeds}/{chrms}/pop{ids}/pop{ids}.polyDFE.fs"
-    threads: 1
-    resources: time_min=60, mem_mb=5000, cpus=1
     run:
         contig = species.get_contig(wildcards.chrms)
         seq_len = contig.recombination_map.sequence_length
@@ -214,8 +205,6 @@ rule run_polydfe:
         rules.download_polydfe.output,
     output: 
         output_dir + "/inference/{demog}/polyDFE/{dfes}/{annots}/{seeds}/{chrms}/pop{ids}/pop{ids}.polyDFE.out"
-    threads: 1
-    resources: time_min=60, mem_mb=5000, cpus=1
     params:
         exec=poly_dfe_exec
     shell:
@@ -228,8 +217,6 @@ rule get_polydfe_bestfit:
         rules.run_polydfe.output
     output:
         output_dir + "/inference/{demog}/polyDFE/{dfes}/{annots}/{seeds}/{chrms}/pop{ids}/pop{ids}.polyDFE.bestfit"
-    threads: 1
-    resources: time_min=60, mem_mb=5000, cpus=1
     shell:
         """
         paste <(echo pop{wildcards.ids}) \
@@ -274,8 +261,6 @@ rule generate_dfe_alpha_fs:
         output_dir + "/inference/{demog}/DFE-alpha/{dfes}/{annots}/{seeds}/{chrms}/pop{ids}/pop{ids}.DFE-alpha.fs"    
     params:
         output = output_dir + "/inference/{demog}/DFE-alpha/{dfes}/{annots}/{seeds}/{chrms}/pop{ids}"
-    threads: 1
-    resources: time_min=60, mem_mb=5000, cpus=1
     run:
         contig = species.get_contig(wildcards.chrms)
         print(input[0], file=sys.stderr, flush=True)
@@ -295,8 +280,6 @@ rule run_dfe_alpha:
         output_dir + "/inference/{demog}/DFE-alpha/{dfes}/{annots}/{seeds}/{chrms}/pop{ids}/nonneu/est_dfe.out"
     params:
         exec=dfe_alpha_exec
-    threads: 1
-    resources: time_min=60, mem_mb=5000, cpus=1
     shell:
         """
         '{params.exec}' -c {input[0]} 
@@ -308,8 +291,6 @@ rule get_dfe_alpha_bestfits:
         rules.run_dfe_alpha.output
     output:
         output_dir + "/inference/{demog}/DFE-alpha/{dfes}/{annots}/{seeds}/{chrms}/pop{ids}/pop{ids}.DFE-alpha.bestfit"
-    threads: 1
-    resources: time_min=60, mem_mb=5000, cpus=1
     shell:
         """
         cat {input} | awk -v id={wildcards.ids} 'BEGIN{{OFS="\\t"}}{{print "pop"id,$22,$10,$12}}' | sed '1ipop_id\\tlikelihood\\tb\\tEs' > {output}
@@ -322,9 +303,7 @@ rule get_dfe_alpha_bestfits:
 rule download_grapes:
     output:
         "ext/grapes/multi_grapes"
-    threads: 1
     message: "Downloading grapes"
-    resources: time_min=60, mem_mb=5000, cpus=1
     shell:
         """
         cd ext/
@@ -340,8 +319,6 @@ rule generate_grapes_fs:
         output_dir + "/simulated_data/{demog}/{dfes}/{annots}/{seeds}/sim_{chrms}.trees"
     output:
         output_dir + "/inference/{demog}/grapes/{dfes}/{annots}/{seeds}/{chrms}/pop{ids}/pop{ids}.grapes.fs"        
-    threads: 1
-    resources: time_min=60, mem_mb=5000, cpus=1
     run:
         contig = species.get_contig(wildcards.chrms)
         seq_len = contig.recombination_map.sequence_length
@@ -366,8 +343,6 @@ rule run_grapes:
         output_dir + "/inference/{demog}/grapes/{dfes}/{annots}/{seeds}/{chrms}/pop{ids}/pop{ids}.grapes.out"
     params:
         exec=grapes_exec
-    threads: 1
-    resources: time_min=60, mem_mb=5000, cpus=1
     shell:
         """
         '{params.exec}' -in {input} -out {output[0]} -model GammaZero -no_div_param > {output[1]}
@@ -378,8 +353,6 @@ rule get_grapes_bestfits:
         output_dir + "/inference/{demog}/grapes/{dfes}/{annots}/{seeds}/{chrms}/pop{ids}/pop{ids}.grapes.out"
     output:
         output_dir + "/inference/{demog}/grapes/{dfes}/{annots}/{seeds}/{chrms}/pop{ids}/pop{ids}.grapes.bestfit"
-    threads: 1
-    resources: time_min=60, mem_mb=5000, cpus=1
     shell:
         """
         grep Separate -A 4 {input} | sed '1d' | awk -F ": " '{{print $2}}' | awk -v id={wildcards.ids} 'BEGIN{{RS="\\t";FS="\\n";OFS="\\t"}}{{print "pop"id,$1,$2,$3,$4}}' | sed '1ipop_id\\tlikelihood\\tshape\\tEs\\ttheta' > {output}
@@ -425,8 +398,6 @@ rule plot_results:
         )
     output:
         output_dir + "/plots/{demog}/{chrms}/{dfes}/{annots}/dfe.inference.benchmark.pdf"
-    threads: 1
-    resources: time_min=60, mem_mb=5000, cpus=1
     run:
         contig = species.get_contig(wildcards.chrms)
         seq_len = contig.recombination_map.sequence_length

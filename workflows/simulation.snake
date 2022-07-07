@@ -61,8 +61,7 @@ rule simulation:
     input:
     output:
         output_dir + "/simulated_data/{demog}/{dfes}/{annots}/{seeds}/sim_{chrms}.trees"
-    threads: 1
-    resources: time_min=3000, mem_mb=10000, cpus=1
+    resources: time=3000, mem_mb=10000
     run:
         
         if wildcards.demog == 'Constant': 
