@@ -31,9 +31,9 @@ jobs:
     - name: Install msmc
       run: |
         cd ext
-        git clone https://github.com/stschiff/msmc.git
-        cat msmc_makefile_stdpopsim_patch > msmc/Makefile 
-        cd msmc 
+	git clone https://github.com/stschiff/msmc2.git
+	cat msmc2_makefile_stdpopsim_patch > msmc2/Makefile
+	cd msmc2
         micromamba run -n analysis2 make
         cd ../../
     - name: Install smc++
