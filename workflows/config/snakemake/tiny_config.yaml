@@ -35,6 +35,6 @@
 "dfe_alpha_data_path_1": "ext/dfe-alpha-release-2.16/data"
 "dfe_alpha_data_path_2": "three-epoch"
 "grapes_exec": "ext/grapes/multi_grapes"
-"msmc_exec" : "ext/msmc/build/msmc"
+"msmc_exec" : "ext/msmc2/build/release/msmc2"
 "stairwayplot_code" : "ext/stairwayplot/swarmops.jar"
 "gone_code" : "ext/GONE/Linux"
