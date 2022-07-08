@@ -299,15 +299,17 @@ rule compound_smcpp:
 
 rule download_msmc:
     output: 
-        directory("ext/msmc")
+        directory("ext/msmc2")
     message: 
         "downloading msmc"
     threads: 1
     shell:
         """
         cd ext
-        git clone https://github.com/stschiff/msmc.git
-        cat msmc_makefile_stdpopsim_patch > msmc/Makefile && cd msmc && make
+	git clone https://github.com/stschiff/msmc2.git
+	cat msmc2_makefile_stdpopsim_patch > msmc2/Makefile
+	cd msmc2
+	make
         cd ../../
         """
 

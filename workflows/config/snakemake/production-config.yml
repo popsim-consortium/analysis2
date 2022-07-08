@@ -32,5 +32,5 @@
 "poly_dfe_exec": "ext/polyDFE/polyDFE-2.0-linux-64-bit"
 "dfe_alpha_data_path_1": "ext/DFE-alpha/data"
 "dfe_alpha_data_path_2": "three-epoch"
-"msmc_exec" : "ext/msmc/build/msmc"
+"msmc_exec" : "ext/msmc2/build/release/msmc2"
 "stairwayplot_code" : "stairwayplot/swarmops.jar"
