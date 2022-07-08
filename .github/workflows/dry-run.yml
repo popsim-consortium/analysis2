@@ -43,7 +43,7 @@ jobs:
         cat smc_setup_stdpopsim_patch > smcpp/setup.py
         cat smc_pyproject_stdpopsim_patch > smcpp/pyproject.toml
         cd smcpp
-	micromamba run -n analysis2 pip install .
+        micromamba run -n analysis2 pip install .
         cd ../../
     - name: Test dry-run
       run: |
