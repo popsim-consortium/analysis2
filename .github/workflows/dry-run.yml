@@ -31,20 +31,20 @@ jobs:
     - name: Install msmc
       run: |
         cd ext
-	git clone https://github.com/stschiff/msmc2.git
-	cat msmc2_makefile_stdpopsim_patch > msmc2/Makefile
-	cd msmc2
-	micromamba run -n analysis2 make
-	cd ../../
+        git clone https://github.com/stschiff/msmc2.git
+        cat msmc2_makefile_stdpopsim_patch > msmc2/Makefile
+        cd msmc2
+        micromamba run -n analysis2 make
+        cd ../../
     - name: Install smc++
       run: |
         cd ext
-	git clone https://github.com/popgenmethods/smcpp
-	cat smc_setup_stdpopsim_patch > smcpp/setup.py
-	cat smc_pyproject_stdpopsim_patch > smcpp/pyproject.toml
-	cd smcpp
+        git clone https://github.com/popgenmethods/smcpp
+        cat smc_setup_stdpopsim_patch > smcpp/setup.py
+        cat smc_pyproject_stdpopsim_patch > smcpp/pyproject.toml
+        cd smcpp
 	micromamba run -n analysis2 pip install .
-	cd ../../
+        cd ../../
     - name: Test dry-run
       run: |
         micromamba run -n analysis2 snakemake -np --use-conda --conda-frontend conda
