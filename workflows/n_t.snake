@@ -250,7 +250,7 @@ rule clone_smcpp:
 rule ts_to_smc:
     input: output_dir + "/simulated_data/{demog}/{dfes}/{annots}/{seeds}/sim_{chrms}.trees"
     output: output_dir + "/inference/smc/{demog}/{dfes}/{annots}/{seeds}/sim_{chrms}.trees.smc.gz"
-    run: smc.write_smcpp_file(input[0], mask_file=None) # Including mask file when it works
+    run: smc.write_smcpp_file(input[0], mask_file=mask_file) # Including mask file when it works
 
 
 rule run_smcpp:
@@ -277,15 +277,25 @@ rule smcpp_plot:
     input: 
         rules.run_smcpp.output
     output: 
-        output_dir + "/plots/{demog}/{chrms}/{dfes}/{annots}/trees.smc.gz.final.json.csv"
+        output_dir + "/plots/{demog}/{chrms}/{dfes}/{annots}/{seeds}/sim_{chrms}.trees.smc.gz.final.json.csv"
     run:
         # TODO get the genetion time from std source
         smc.run_smcpp_plot(input[0], output[0], generation_time=generation_time_helper(wildcards,species))
 
 
+def ne_files_smcpp(wildcards):
+    return expand(output_dir + "/plots/{demog}/{chrms}/{dfes}/{annots}/{seeds}/sim_{chrms}.trees.smc.gz.final.json.csv",
+                seeds=seed_array,
+                chrms=chrm_list,
+                dfes=wildcards.dfes,
+                demog=wildcards.demog,
+                annots=wildcards.annots,
+            )
+
+
 rule compound_smcpp:
-    input: output_dir + "/plots/{demog}/{chrms}/{dfes}/{annots}/trees.smc.gz.final.json.csv"
-    output: output_dir + "/plots/{demog}/{chrms}/{dfes}/{annots}/smcpp_estimated_Ne.png"
+    input: output_dir + "/plots/{demog}/{chrms}/{dfes}/{annots}/{seeds}/sim_{chrms}.trees.smc.gz.final.json.csv"
+    output: output_dir + "/plots/{demog}/{chrms}/{dfes}/{annots}/{seeds}/smcpp_estimated_Ne.png"
     run: 
         model = species.get_demographic_model(wildcards.demog)
         plots.plot_compound_smcpp(input, output[0], model, num_sampled_genomes_per_replicate, 
@@ -342,8 +352,6 @@ rule run_msmc:
                         )
         input_file_string = " ".join(inputs)
         output_file_string = output_dir + f"/inference/smc/{wildcards.demog}/{wildcards.dfes}/{wildcards.annots}/{wildcards.seeds}/{wildcards.samps}.{wildcards.chrms}.trees.multihep.txt"
-        print("This is the string")
-        print(output_file_string)
         msmc.run_msmc_estimate(input_file_string, output_file_string, msmc_exec,
             iterations=num_msmc_iterations, ncores=threads)
 
@@ -496,7 +504,7 @@ rule all_plot:
             max_time = species.population_size
             max_time *= 4 # 2?
             steps = np.linspace(1, max_time, max_time+1)
-            # , input.f2
+            # , 
             # We need to transform that into a dictionary
             model = stdpopsim.PiecewiseConstantSize(species.population_size)
         else:
@@ -513,4 +521,4 @@ rule all_plot:
             species=species.id, 
             # pop_id=population_id, 
             steps=steps, 
-            )
+            ) # input.f2

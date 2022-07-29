@@ -16,7 +16,7 @@
 "chrm_list": "chr21"
 "dfe_list": ["Gamma_H17"]
 "output_dir": "results"
-
+"mask_file": "workflows/masks/HapmapII_GRCh37.mask.bed"
 
 # slim settings
 "slim_scaling_factor": 15
@@ -26,7 +26,7 @@
 "num_sampled_genomes_msmc" : [2]
 "num_sampled_genomes_per_replicate": [2]
 "num_msmc_iterations" : 1
-"annotation_list": ["ensembl_havana_104_exons"]
+"annotation_list": ["ensembl_havana_104_exons", "none"]
 "gone_phase" : 1 # 0 for pseudohaploid, 1 for unknown phase, 2 for phased
 "gone_max_snps" : 500 # default=50000
 "gone_threads" : 1

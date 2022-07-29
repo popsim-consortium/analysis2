@@ -31,6 +31,24 @@ def write_stairway_sfs(sequence_length, num_samples, sfs, path):
             print(int(x), end="\t", file=out)
         print(file=out)
 
+def mask_positions(mask_file, ts_p, snp_pos):
+    """
+    Mask positions that overlap the mask file
+    """
+    retain = np.full(len(snp_pos), True)
+    total_length = 0
+    mask_table = pd.read_csv(mask_file, sep="\t", header=None)
+    chrom = ts_p.split("/")[-1].split(".")[0]
+    chrom = chrom.split("sim_")[1]
+    sub = mask_table[mask_table[0] == chrom]
+    mask_ints = pd.IntervalIndex.from_arrays(sub[1], sub[2])
+    tmp_bool = [mask_ints.contains(x) for x in snp_pos]
+    for i in range(len(tmp_bool)):
+        if sum(tmp_bool[i]) > 0:
+            retain[i] = False    
+    total_length -= np.sum(mask_ints.length)
+    return([retain, total_length])
+
 
 class StairwayPlotRunner(object):
     """
@@ -57,44 +75,70 @@ class StairwayPlotRunner(object):
             total_length += ts.sequence_length
             num_samples = ts.num_samples
             haps = ts.genotype_matrix()
-            # print(haps.shape)
+
+            # Mapping mutation type IDs to class of mutation (e.g., neutral, non-neutral)
+            class_muts = {}
+            for dfe in ts.metadata["stdpopsim"]["DFEs"]:
+                for mt in dfe["mutation_types"]:
+                    mid = mt["slim_mutation_type_id"]
+                    if not mid in class_muts:
+                        class_muts[mid] = "neutral" if mt["is_neutral"] else "non_neutral"
+
+            site_class = np.empty(ts.num_sites, dtype=object)
+
+            # Finding neutral positions
+            neu_positions = []
+            non_neu_positions = []
+            for j, s in enumerate(ts.sites()):
+                mut_hits = []
+                for m in s.mutations:
+                    for md in m.metadata["mutation_list"]:
+                        mut_hits.append(md["mutation_type"])
+                        if set(class_muts[md["mutation_type"]]) == set("neutral"):
+                            neu_positions.append(m.site)
+                        if set(class_muts[md["mutation_type"]]) == set("non_neutral"):
+                            non_neu_positions.append(m.site)
+                site_class[j] = class_muts[mut_hits[0]] if len(mut_hits) == 1 else "double_hit" 
+            assert sum(site_class == None) == 0
+
+            # All SNP locs
+            snp_locs_all =  [int(x.site.position) for x in ts.variants()]
+            snp_locs = [snp_locs_all[index] for index in neu_positions]
+            snp_locs_non_neutral = [snp_locs_all[index] for index in non_neu_positions]
 
             SFSs = []
-            # Masking
-            # print("This is the number of mutations")
-            # print(ts.get_num_mutations())
-            # print("This is the number of variants")
-            # print(ts.variants())
-            # print("This is the number of sites")
-            # print(ts.num_sites)
-            #retain = np.full(ts.get_num_mutations(), False)
 
-            # This part is not really working (dimension problem)
-            # Masking
-            retain = np.full(ts.num_sites, False)
-            # if mask_file:
-            #     mask_table = pd.read_csv(mask_file, sep="\t", header=None)
-            #     chrom = ts_p.split("/")[-1].split(".")[0]
-            #     sub = mask_table[mask_table[0] == chrom]
-            #     mask_ints = pd.IntervalIndex.from_arrays(sub[1], sub[2])
-            #     snp_locs = [int(x.site.position) for x in ts.variants()]
-            #     tmp_bool = [mask_ints.contains(x) for x in snp_locs]
-            #     retain = np.logical_or(retain, tmp_bool)
-            #     total_length -= np.sum(mask_ints.length)
+            # Getting ride of the neutral positions that overlap with the mask region
+            retain = np.full(len(neu_positions), True)
+            retain_non_neu = np.full(len(non_neu_positions), True)
+            if mask_file:
+                retain, total_length = mask_positions(mask_file, ts_p, snp_locs)
+                retain_non_neu, total_length = mask_positions(mask_file, ts_p, snp_locs_non_neutral)
 
-            #retain = retain.flatten()
-            retain = np.logical_not(retain)
-            # print("This is the shape of retain")
-            # print(retain.shape)
-            # append unmasked SFS
-            SFSs.append(allel.sfs(allel.HaplotypeArray(haps).count_alleles()[:, 1])[1:])
-            # get masked allele counts and append SFS
-            allele_counts = allel.HaplotypeArray(haps[retain,:]).count_alleles()
-            #allele_counts = allel.HaplotypeArray(haps).count_alleles()
+            # Extract neutral positions haplotypes
+            haps_neu = haps[neu_positions,:]
+            haps_non_neu = haps[non_neu_positions,:]         
+
+            # append unmasked neutral SFS
+            SFSs.append(allel.sfs(allel.HaplotypeArray(haps_neu).count_alleles()[:, 1])[1:])
+            allele_counts = allel.HaplotypeArray(haps_neu).count_alleles()
+
+            # get masked allele counts and append neutral masked SFS
+            allele_counts = allel.HaplotypeArray(haps_neu[retain,:]).count_alleles()
+
+            # append masked neutral SFS
             SFSs.append(allel.sfs(allele_counts[:, 1])[1:])
             sfs_path = ts_p+".sfs.pdf"
+
+            # plotting masked and unmasked neutral SFSs and non neutral SFSs
             plots.plot_sfs(SFSs, sfs_path)
-            # Bootstrap allele counts
+            try: 
+                plots.plot_sfs([allel.sfs(allel.HaplotypeArray(haps_non_neu[retain_non_neu,:]).count_alleles()[:, 1])[1:]], ts_p + ".sfs.non_neutral.pdf")
+            except:
+                print("Only neutral mutations are observed")
+                continue
+            
+            # Bootstrap allele counts (neutral)
             derived_counts_all[0].extend(allele_counts[:, 1])
             for j in range(1, num_bootstraps + 1):
                 nsites = np.shape(allele_counts)[0]
@@ -102,6 +146,7 @@ class StairwayPlotRunner(object):
                 bootac = allele_counts[bootset, :]
                 der_bootac = bootac[:, 1]
                 derived_counts_all[j].extend(der_bootac)
+
         # Get the SFS minus the 0 bin and write output
         stairway_files = []
         for l in range(len(derived_counts_all)):
@@ -112,6 +157,7 @@ class StairwayPlotRunner(object):
 
         return stairway_files
 
+
     def _run_theta_estimation(self, input_file):
         """
         Runs stairway plot on the specified file, resulting in the output being written
@@ -119,8 +165,6 @@ class StairwayPlotRunner(object):
         """
         num_runs = 1
         dim_factor = 5000
-        # print("This is the input file")
-        # print(input_file)
         cmd = (
             f"{self.java_exe} -cp {self.classpath} Stairway_plot_theta_estimation02 "
             f"{input_file} {num_runs} {dim_factor}")

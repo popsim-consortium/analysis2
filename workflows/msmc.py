@@ -50,14 +50,14 @@ def write_msmc_file(path, output, num_sampled_genomes_msmc, mask_file=None):
         dirr = os.path.dirname(path)
         filen = os.path.basename(path)
         sep = filen.split(".")
-        chrom = sep[0].split("_")[0]
+        chrom = sep[0].split("_")[1] # fixing sim_ name
         sep.insert(0, str(sample_size))
         fi = open(output, "w")
         prev = 0
         if mask_file:
             for var in ts.variants():
                 cur = int(var.site.position)
-                if cur > prev and (not mask_dict[chrom].contains(cur)):
+                if cur > prev and sum(mask_dict[chrom].contains(cur)) == 0:
                     cur_int = pd.Interval(left=prev, right=cur)
                     masked_bit = np.sum([getIntervalOverlap(cur_int, x) for x in
                                          mask_dict[chrom]])
