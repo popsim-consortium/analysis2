@@ -192,7 +192,7 @@ rule run_stairwayplot:
         runner.run_summary(output, mutation_rate=mutation_rate, generation_time=generation_time_helper(wildcards,species))
 
 
-def ne_files(wildcards):
+def ne_files_sp(wildcards):
     return expand(output_dir + "/inference/sp/{demog}/{dfes}/{annots}/{seeds}/{chrms}/stairwayplot_estimated_Ne.txt",
         seeds=seed_array,
         chrms=chrm_list,
@@ -484,7 +484,7 @@ rule compound_gone:
 
 rule all_plot:
     input:
-        f1=ne_files,
+        f1=ne_files_sp,
         #f2 = ne_files_smcpp,
         f3=ne_files_msmc,
         f4=ne_files_gone,
@@ -506,7 +506,11 @@ rule all_plot:
         num_samples_per_population = {}
         for ns, popn in zip(demo_sample_size_dict[wildcards.demog], model.populations):
             num_samples_per_population[popn.name] = ns
-        plots.plot_all_ne_estimates(input.f1, input.f3, input.f4, output[0],
+        plots.plot_all_ne_estimates(
+            input.f1, 
+            input.f3, 
+            input.f4, 
+            output[0],
             model=model, 
             n_samp=num_samples_per_population, 
             generation_time=generation_time_helper(wildcards,species), 
