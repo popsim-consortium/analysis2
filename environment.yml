@@ -1,12 +1,8 @@
 name: analysis2
 channels:
   - conda-forge
-  - bioconda
 dependencies:
-  - gcc
-  - gmp
-  - gxx
-  - mpfr
+  - python==3.8
   - pip
   - slim==3.7.1
   - snakemake
@@ -21,12 +17,9 @@ dependencies:
   - cython
   - tqdm
   - h5py
-  - gfortran
   - blas
   - gsl
   - dadi
-  - mamba
   - pip:
     - git+https://github.com/popsim-consortium/stdpopsim.git
     - scikit-allel
-    - git+https://github.com/xin-huang/dadi-cli

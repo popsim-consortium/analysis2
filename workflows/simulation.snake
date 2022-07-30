@@ -22,6 +22,11 @@ output_dir = os.path.abspath(config["output_dir"])
 # The analysis species
 species = stdpopsim.get_species(config["species"])
 
+# The number of samples to simulate for within each population
+num_samples_per_population = config["num_samples_per_population"]
+sample_sizes = dict()
+for i in range(len(num_samples_per_population)):
+    sample_sizes[str(i)] = num_samples_per_population[i]
 
 # The names of all chromosomes to simulate, separated by commas
 # Use "all" to simulate all chromsomes for the genome
@@ -61,7 +66,8 @@ rule simulation:
     input:
     output:
         output_dir + "/simulated_data/{demog}/{dfes}/{annots}/{seeds}/sim_{chrms}.trees"
-    resources: time=3000, mem_mb=10000
+    threads: 1
+    resources: time_min=3000, mem_mb=10000, cpus=1
     run:
         
         if wildcards.demog == 'Constant': 

@@ -114,7 +114,7 @@ def convert_msmc_output(results_file, outfile, mutation_rate, generation_time):
     out_fp = open(outfile, "w")
     in_fp = open(results_file, "r")
     in_fp.readline()
-    out_fp.write("label,x,y,plot_type,plot_num\n")
+    out_fp.write("label,x,y,plot_type,plot_num")
     for line in in_fp:
         result = line.split()
         time = float(result[1])

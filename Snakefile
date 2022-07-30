@@ -11,8 +11,7 @@ Parameters are defined by the config.yaml file in
 workflows/config/snakemake/
 """
 
-configfile: "workflows/config/snakemake/tiny_config.yaml"
-
+configfile: "workflows/config/snakemake/config.yaml"
 
 module simulation_workflow:
     snakefile:
@@ -42,29 +41,3 @@ rule all:
         rules.n_t_all.input,
        # rules
     default_target: True
-rule clean_ext:
-    shell:
-        """
-        rm -rf ext/GONE/ ext/grapes/ ext/stairwayplot/ ext/msmc/ 
-        rm -rf ext/stairwayplot
-        rm -rf ext/polyDFE
-        """
-rule clean_output:
-    shell:
-        """
-        rm -rf {output_dir}
-        """
-rule clean_all:
-    input:
-        rules.clean_ext.input,
-        rules.clean_output.input,
-        #rules
-    message: "Cleaning all"
-    shell:
-        """
-        rm -rf ext/GONE/ ext/grapes/ ext/stairwayplot/ ext/msmc/ 
-        rm -rf ext/stairwayplot
-        rm -rf ext/polyDFE
-        rm -rf {output_dir}
-        """
-    

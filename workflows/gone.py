@@ -41,7 +41,7 @@ def copy(gone_code,outpath,seed,threads):
     cmd += "".join(["cat ", gone_code, "/PROGRAMMES/GONEparallel.sh | sed s/\"threads=\$(getconf _NPROCESSORS_ONLN)\"/\"threads=", str(threads) ,"\"/g | sed s/options_for_GONE=\\\"\\\"/options_for_GONE=\\\"-sd\ ", seed, "\\\"/g > ", outpath,"/PROGRAMMES/GONEparallel.sh;\n\n"])
     cmd += "".join(["chmod u+x ", outpath, "/PROGRAMMES/GONEparallel.sh;\n\n"])
     cmd += "".join(["touch ",outpath,"/.scripts_copied"])
-    # print(cmd)
+    print(cmd)
     subprocess.run(cmd, shell=True, check=True)
 
         

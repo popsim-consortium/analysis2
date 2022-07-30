@@ -1,154 +1,94 @@
-[![build Status](https://github.com/popsim-consortium/analysis2/actions/workflows/dry-run.yml/badge.svg?branch=main)](https://github.com/popsim-consortium/analysis2/actions)
-
 # Analysis 2
 Analysis of inference methods on standard population models including selection.
 Here's how to get going, if you'd like to run this analysis
 
 # Get the Analysis repo
 Now clone the analysis2 repo, and install its dependencies
-```console
-$ git clone git@github.com:popsim-consortium/analysis2.git
-$ cd analysis2/
+```
+git clone git@github.com:popsim-consortium/analysis2.git
+cd analysis2/
 ```
 
 # Set up your python environment to run the analysis
 We recommend you start by creating a new `conda` environment for the analysis. This can be done using the command below, which will
-create a new `conda` env called `analysis2`. Currently the workflow is targeted to run on python 3.9
+create a new `conda` env called `analysis2`. Currently the workflow is targeted to run on python 3.8. We believe
+there are issues when running python 3.9 or higher.
 
-```console
-$ conda env create -f environment.yml
-$ conda activate analysis2
+```
+conda env create -f environment.yml
+conda activate analysis2
 ```
 
-# Set the config example
-With the environment in place, the next step is to set the
-workflow parameters using the a config file. 
-`analysis2` currently ships with three example config
-files, each found in `config/snakemake/`: `tiny_config.yaml`,
-`config.yaml`, and `production-config.yaml`. Respectively
-these represent a very small run, a small run, and the
-final production settings used for the paper (TBD)
-
-The workflow can be pointed at one of these config files
-by editing the following line in the `Snakefile` file
-
-```yaml
-configfile: "workflows/config/snakemake/tiny_config.yaml"
+For using `msmc` we need to download and compile it to play nice
+with the conda environment that we have set up.
+```
+cd ext
+git clone https://github.com/stschiff/msmc.git
+cat msmc_makefile_stdpopsim_patch > msmc/Makefile && cd msmc && make
+cd ../../
 ```
 
-Having set the config file, and perhaps edited to your wishes,
-you are now ready to try a dry run.
-
-# Perform a dry run of the workflow
-To make sure that things are working, next run a dry run of the complete
-workflow
-
-```console
-$ snakemake -c1 all -n
+For using `DFE-alpha`, we need to download the program and extra data (5GB) from http://www.homepages.ed.ac.uk/pkeightl/dfe_alpha/download-dfe-alpha.html
+```
+cd ext
+wget -c http://homepages.ed.ac.uk/eang33/dfe_alpha/dfe-alpha-release-2.16.tar.gz
+tar -xvf dfe-alpha-release-2.16.tar.gz
+cat dfe_alpha_makefile_stdpopsim_patch > dfe-alpha-release-2.16/Makefile && cd dfe-alpha-release-2.16 && make
+wget -c https://datashare.ed.ac.uk/bitstream/handle/10283/2730/data.tar.gz?sequence=1&isAllowed=y
+tar -xvf data.tar.gz\?sequence\=1
+cd ../../
 ```
 
-if the dry run checks out, you should be ready to run. 
-
-# Run the workflow
-You should now be set to run the complete workflow. This
-will consist broadly of: 1) simulating the chromosomes
-of interest, 2) downloading and installing the tools to be 
-used in the anlaysis of the simulated data, 3) analysis of the
-simulated tree sequences using the aforementioned tools, 
-and 4) summarization of the analyses into figures. 
-
-The Snakemake workflow has a number of targets:
-
-- `all` -- run the complete analysis
-- `clean_all` -- removes all simulations, downloads, and analysis
-- `clean_ext` -- removes all downloaded external tools
-- `clean_output` -- removes all simulation and analysis
-
-To run the complete workflow on `M` cores use the following 
-
-```console
-$ snakemake -c M all
+For using `polyDFE` and `grapes`, we can download them from their GitHub repositories.
+```
+cd ext
+git clone https://github.com/paula-tataru/polyDFE.git
+cd polyDFE
+chmod a+x polyDFE-2.0-linux-64-bit
+wget -c https://github.com/BioPP/grapes/releases/download/v1.1.0/grapes-x86_64-bin-static-1.1.0-1.tar.gz
+tar -xvf grapes-x86_64-bin-static-1.1.0-1.tar.gz
+cd ..
 ```
 
-One can run the `clean_` targets of the workflow similarly.
+Further instructions can be currently found in each task directory.
+A small example to simulate genomes with selection is described below.
 
-## Running only a portion of the workflow
-Sometimes the user only wants to run a subsection of the workflow. 
-This is possible using `Snakemake` with the `--snakefile` option
-along with the component workflows we have included. For instance,
-to just perform the simulation steps of the workflow using 10 CPUs 
-the user can say
+------------
+# Simulating selection with stdpopsim
 
-```console
-$ snakemake -c 10 --snakefile workflows/simulation.snake
+For each HomSap chromosome one can simulate selection in specific regions (e.g. coding region)
+by using the function in stdpopsim and passed to
+`stdpopsim.species.get_annotations` (see [the catalog](https://popsim-consortium.github.io/stdpopsim-docs/latest/tutorial.html#simulating-selection-on-exons) for details). Below is a complete example
+that uses a given annotation to simulate selection on chr20.
+
+```python
+import numpy as np
+import stdpopsim
+
+species = stdpopsim.get_species("HomSap")
+
+# Adding a specific Distribution of fitness effects
+dfe = species.get_dfe("Gamma_K17")
+
+contig = species.get_contig("chr20")
+model = species.get_demographic_model("OutOfAfrica_3G09")
+samples = model.get_samples(100, 100, 100)  # YRI, CEU, CHB
+
+# Extracting gene annottation
+exons = species.get_annotations("ensembl_havana_104_exons")
+exon_intervals = exons.get_chromosome_annotations("chr20").astype("int")
+contig.add_dfe(intervals=exon_intervals, DFE=dfe)
+
+# Engine used for simulations
+engine = stdpopsim.get_engine("slim")
+
+# Simulate
+ts = engine.simulate(
+    model,
+    contig,
+    samples,
+    seed=236,
+    slim_scaling_factor=100,
+    slim_burn_in=10,
+)
 ```
-
-and only that part of the analysis pipeline will run. 
-We currently have 3 sub-workflows: `simulations.snake`
-which does the simulations, `n_t.snake` which performs 
-N(t) type analyses (e.g. `msmc`), and `dfe.snake` which
-houses the portion of the workflow that does estimation
-of the DFE.
-
-
-## Running the workflow on a cluster
-Currently we have provided two example `Snakemake` profiles
-that allow a user to run the `analysis2` workflow on quite
-easily. These can be found in `workflows/config/snakemake/oregon_profile`
-and `workflows/config/snakemake/arizona_profile`.
-
-### Cluster profile files
-Each of those directories contains a single file, `config.yaml`,
-that lays out the cluster specific settings needed to launch jobs.
-
-For instance the `oregon_profile/config.yaml`, which is meant
-to run using a cluster with a `slurm` scheduler looks like this
-
-```yaml
-cluster:
-        mkdir -p logs/{rule} &&
-        sbatch
-                --partition=kern,kerngpu
-                --account=kernlab
-                --cpus-per-task={threads}
-                --mem={resources.mem_mb}
-                --time={resources.time}
-                --job-name=smk-{rule}-{wildcards}
-                --output=logs/{rule}/{rule}-{wildcards}-%j.out
-default-resources:
-        - time=60
-        - mem_mb=5000
-        - threads=1
-restart-times: 3
-max-jobs-per-second: 10
-max-status-checks-per-second: 1
-local-cores: 1
-latency-wait: 60
-jobs: 500
-keep-going: True
-rerun-incomplete: True
-printshellcmds: True
-scheduler: greedy
-use-conda: True
-```
-
-to adopt this to a new `slurm` cluster a user would have to:
-- change the `partition` value to appropriately named partitions
-- change the `account` name
-
-### Run command
-At the command line this eases things tremendously. We can lauch the entire
-workflow simply with
-
-```console
-$ snakemake --profile workflows/config/snakemake/oregon_profile/
-```
-
-`Snakemake` then will take care of all of the communication with the cluster,
-launching jobs, and monitoring them for completeness. 
-
-### Further reading on profiles
-There are a lot of great examples on how to set up profiles for running
-workflows on various cluster architectures. One excellent resource
-is this repository of publicly available profiles https://github.com/snakemake-profiles/doc
-
