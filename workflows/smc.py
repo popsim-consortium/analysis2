@@ -36,10 +36,10 @@ def write_smcpp_file(path, mask_file, selection=None):
         cmd = f"tabix -p bed {inter_mask_path}"
         logging.info("Running:" + cmd)
         subprocess.run(cmd, shell=True, check=True)
-        cmd = f"docker run --rm -v $PWD:/mnt terhorst/smcpp:latest vcf2smc --mask {inter_mask_path} {vz_file} "
+        cmd = f"smc++ vcf2smc --mask {inter_mask_path} {vz_file} "
         cmd = cmd + f"{smc_file} {chr_name} pop1:"
     else:
-        cmd = f"docker run --rm -v $PWD:/mnt terhorst/smcpp:latest vcf2smc {vz_file} {smc_file} {chr_name} pop1:"
+        cmd = f"smc++ vcf2smc {vz_file} {smc_file} {chr_name} pop1:"
 
     for n in range(ts.num_samples // 2):
         cmd = cmd + f"tsk_{n},"

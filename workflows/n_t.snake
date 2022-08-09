@@ -22,16 +22,16 @@ import smc
 import msmc
 import gone
 import plots
+import masks
 
 # ###############################################################################
 # KNOBS - 
 # ###############################################################################
 
-
 # A seed to replicate results
 # TODO mutation rates
 
-configfile: "workflows/config/snakemake/config.yaml"
+configfile: "workflows/config/snakemake/tiny_config.yaml"
 
 np.random.seed(config["seed"])
 output_dir = os.path.abspath(config["output_dir"])
@@ -101,6 +101,11 @@ annotation_list = config["annotation_list"]
 # GENERAL RULES & GLOBALS
 # ###############################################################################
 
+module simulation_workflow:
+    snakefile:
+        "simulation.snake"
+    config: config
+use rule * from simulation_workflow as simulation_*
 
 seed_array = np.random.random_integers(1,2**31,replicates)
 genetic_map_downloaded_flag= ".genetic_map_downloaded"
@@ -120,7 +125,8 @@ rule all:
         dfes=dfe_list, 
         annots=annotation_list,
         seeds=seed_array,
-        )
+        ),
+    rules.simulation_all.input,
 
 
 rule download_genetic_map:
@@ -187,7 +193,13 @@ rule run_stairwayplot:
             workdir=output_dir + "/inference/" + wildcards.demog + "/" + wildcards.dfes + "/" +
                 wildcards.annots + "/" + wildcards.seeds + "/",
             stairway_dir=pathlib.Path.cwd() / "ext/stairwayplot")
-        runner.ts_to_stairway(inputs, num_bootstraps=200, mask_file=mask_file)
+        mask_intervals = masks.get_combined_masks(
+                                            species.id, 
+                                            mask_file, 
+                                            wildcards.chrms, 
+                                            chrom_annotation=wildcards.annots,
+                                        )
+        runner.ts_to_stairway(inputs, num_bootstraps=200, mask_intervals=mask_intervals)
         runner.run_theta_estimation(max_workers=threads, show_progress=True)
         runner.run_summary(output, mutation_rate=mutation_rate, generation_time=generation_time_helper(wildcards,species))
 
@@ -250,7 +262,14 @@ rule clone_smcpp:
 rule ts_to_smc:
     input: output_dir + "/simulated_data/{demog}/{dfes}/{annots}/{seeds}/sim_{chrms}.trees"
     output: output_dir + "/inference/smc/{demog}/{dfes}/{annots}/{seeds}/sim_{chrms}.trees.smc.gz"
-    run: smc.write_smcpp_file(input[0], mask_file=None) # Including mask file when it works
+    run: 
+        mask_intervals = masks.get_combined_masks(
+                                    species.id, 
+                                    mask_file, 
+                                    wildcards.chrms, 
+                                    chrom_annotation=wildcards.annots,
+                                )
+        smc.write_smcpp_file(input[0], mask_intervals=mask_intervals) # Including mask file when it works
 
 
 rule run_smcpp:
@@ -277,15 +296,25 @@ rule smcpp_plot:
     input: 
         rules.run_smcpp.output
     output: 
-        output_dir + "/plots/{demog}/{chrms}/{dfes}/{annots}/trees.smc.gz.final.json.csv"
+        output_dir + "/plots/{demog}/{chrms}/{dfes}/{annots}/{seeds}/sim_{chrms}.trees.smc.gz.final.json.csv"
     run:
         # TODO get the genetion time from std source
         smc.run_smcpp_plot(input[0], output[0], generation_time=generation_time_helper(wildcards,species))
 
 
+def ne_files_smcpp(wildcards):
+    return expand(output_dir + "/plots/{demog}/{chrms}/{dfes}/{annots}/{seeds}/sim_{chrms}.trees.smc.gz.final.json.csv",
+                seeds=seed_array,
+                chrms=chrm_list,
+                dfes=wildcards.dfes,
+                demog=wildcards.demog,
+                annots=wildcards.annots,
+            )
+
+
 rule compound_smcpp:
-    input: output_dir + "/plots/{demog}/{chrms}/{dfes}/{annots}/trees.smc.gz.final.json.csv"
-    output: output_dir + "/plots/{demog}/{chrms}/{dfes}/{annots}/smcpp_estimated_Ne.png"
+    input: output_dir + "/plots/{demog}/{chrms}/{dfes}/{annots}/{seeds}/sim_{chrms}.trees.smc.gz.final.json.csv"
+    output: output_dir + "/plots/{demog}/{chrms}/{dfes}/{annots}/{seeds}/smcpp_estimated_Ne.png"
     run: 
         model = species.get_demographic_model(wildcards.demog)
         plots.plot_compound_smcpp(input, output[0], model, num_sampled_genomes_per_replicate, 
@@ -315,10 +344,16 @@ rule download_msmc:
 
 rule ts_to_multihep:
     input: output_dir + "/simulated_data/{demog}/{dfes}/{annots}/{seeds}/sim_{chrms}.trees"
-    output: output_dir + "/inference/smc/{demog}/{dfes}/{annots}/{seeds}/{samps}.{chrms}.trees.multihep.txt"
+    output: output_dir + "/inference/msmc/{demog}/{dfes}/{annots}/{seeds}/{samps}.{chrms}.trees.multihep.txt"
     run: 
         print(input[0], num_sampled_genomes_msmc, mask_file)
-        msmc.write_msmc_file(input[0], output[0], num_sampled_genomes_msmc, mask_file)
+        mask_intervals = masks.get_combined_masks(
+                            species.id, 
+                            mask_file, 
+                            wildcards.chrms, 
+                            chrom_annotation=wildcards.annots,
+                        )
+        msmc.write_msmc_file(input[0], output[0], num_sampled_genomes_msmc, mask_intervals)
 
 
 rule run_msmc:
@@ -329,10 +364,10 @@ rule run_msmc:
         #    chrms=chrm_list, seeds=seed_array, samps=num_sampled_genomes_msmc, selection=selection)
         rules.ts_to_multihep.output,
         rules.download_msmc.output
-    output: output_dir + "/inference/smc/{demog}/{dfes}/{annots}/{seeds}/{samps}.{chrms}.trees.multihep.txt.final.txt"
+    output: output_dir + "/inference/msmc/{demog}/{dfes}/{annots}/{seeds}/{samps}.{chrms}.trees.multihep.txt.final.txt"
     threads: 8 
     run: 
-        inputs = expand(output_dir + "/inference/smc/{demog}/{dfes}/{annots}/{seeds}/{samps}.{chrms}.trees.multihep.txt",
+        inputs = expand(output_dir + "/inference/msmc/{demog}/{dfes}/{annots}/{seeds}/{samps}.{chrms}.trees.multihep.txt",
                         seeds=wildcards.seeds,
                         chrms=chrm_list,
                         dfes=wildcards.dfes,
@@ -341,16 +376,14 @@ rule run_msmc:
                         annots=wildcards.annots,
                         )
         input_file_string = " ".join(inputs)
-        output_file_string = output_dir + f"/inference/smc/{wildcards.demog}/{wildcards.dfes}/{wildcards.annots}/{wildcards.seeds}/{wildcards.samps}.{wildcards.chrms}.trees.multihep.txt"
-        print("This is the string")
-        print(output_file_string)
+        output_file_string = output_dir + f"/inference/msmc/{wildcards.demog}/{wildcards.dfes}/{wildcards.annots}/{wildcards.seeds}/{wildcards.samps}.{wildcards.chrms}.trees.multihep.txt"
         msmc.run_msmc_estimate(input_file_string, output_file_string, msmc_exec,
             iterations=num_msmc_iterations, ncores=threads)
 
 
 rule convert_msmc:
     input: rules.run_msmc.output
-    output: output_dir + "/inference/smc/{demog}/{dfes}/{annots}/{seeds}/{samps}.{chrms}.trees.multihep.txt.final.txt.csv"
+    output: output_dir + "/inference/msmc/{demog}/{dfes}/{annots}/{seeds}/{samps}.{chrms}.trees.multihep.txt.final.txt.csv"
     run:
         msmc.convert_msmc_output(input[0] ,output[0],
             mutation_rate=mutation_rate,
@@ -359,7 +392,7 @@ rule convert_msmc:
 
 
 def ne_files_msmc(wildcards):
-    return expand(output_dir + "/inference/smc/{demog}/{dfes}/{annots}/{seeds}/{samps}.{chrms}.trees.multihep.txt.final.txt.csv",
+    return expand(output_dir + "/inference/msmc/{demog}/{dfes}/{annots}/{seeds}/{samps}.{chrms}.trees.multihep.txt.final.txt.csv",
                 seeds=seed_array,
                 chrms=chrm_list,
                 dfes=wildcards.dfes,
@@ -437,8 +470,13 @@ rule gone_prep_inputs:
         if not genetic_map.is_cached():
             genetic_map.download()
         gm_chr = genetic_map.get_chromosome_map(wildcards.chrms)
-
-        gone.ts2plink(input[0], output[0], output[1], gm_chr)
+        mask_intervals = masks.get_combined_masks(
+                                            species.id, 
+                                            mask_file, 
+                                            wildcards.chrms, 
+                                            chrom_annotation=wildcards.annots,
+                                        )
+        gone.ts2plink(input[0], output[0], output[1], gm_chr, wildcards.chrms, mask_intervals=mask_intervals)
 
 
 rule gone_run:
@@ -496,7 +534,7 @@ rule all_plot:
             max_time = species.population_size
             max_time *= 4 # 2?
             steps = np.linspace(1, max_time, max_time+1)
-            # , input.f2
+            # , 
             # We need to transform that into a dictionary
             model = stdpopsim.PiecewiseConstantSize(species.population_size)
         else:
@@ -517,4 +555,4 @@ rule all_plot:
             species=species.id, 
             # pop_id=population_id, 
             steps=steps, 
-            )
+            ) # input.f2

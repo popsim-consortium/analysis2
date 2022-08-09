@@ -12,6 +12,7 @@
 "chrm_list": "chr21"
 "dfe_list": ["Gamma_H17"]
 "output_dir": "results"
+"mask_file": "workflows/masks/HapmapII_GRCh37.mask.bed"
 
 
 # slim settings

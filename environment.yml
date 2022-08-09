@@ -26,6 +26,7 @@ dependencies:
   - gsl
   - dadi
   - mamba
+  - openjdk
   - pip:
     - git+https://github.com/popsim-consortium/stdpopsim.git
     - scikit-allel
