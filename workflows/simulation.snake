@@ -46,7 +46,6 @@ annotation_list = config["annotation_list"]
 # ###############################################################################
 # GENERAL RULES & GLOBALS
 # ###############################################################################
-
 rule all:
     input:
         expand(output_dir + "/simulated_data/{demog}/{dfes}/{annots}/{seeds}/sim_{chrms}.trees", 
@@ -63,7 +62,6 @@ rule simulation:
         output_dir + "/simulated_data/{demog}/{dfes}/{annots}/{seeds}/sim_{chrms}.trees"
     resources: time=3000, mem_mb=10000
     run:
-        
         if wildcards.demog == 'Constant': 
             model = stdpopsim.PiecewiseConstantSize(species.population_size)
             mutation_rate = 1.29e-08 # where is this from?

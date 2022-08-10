@@ -31,7 +31,7 @@ import masks
 # A seed to replicate results
 # TODO mutation rates
 
-configfile: "workflows/config/snakemake/tiny_config.yaml"
+configfile: "workflows/config/snakemake/config.yaml"
 
 np.random.seed(config["seed"])
 output_dir = os.path.abspath(config["output_dir"])
@@ -117,6 +117,17 @@ try:
 except KeyError:
     mask_file = None
 
+localrules:  
+    download_genetic_map,
+    download_msmc,
+    sp_download,
+    clone_smcpp,
+    gone_clone,
+    gone_copy,
+    gone_params,
+    all_plot
+
+
 rule all:
    input: 
     expand(output_dir + "/plots/{demog}/{chrms}/{dfes}/{annots}/all_estimated_Ne.pdf", 
@@ -180,13 +191,14 @@ rule run_stairwayplot:
         rules.sp_download.output,
     output: output_dir + "/inference/sp/{demog}/{dfes}/{annots}/{seeds}/{chrms}/stairwayplot_estimated_Ne.txt"
     threads: 20
+    resources: mem_mb=120000
     run:
         inputs = expand(output_dir + "/simulated_data/{demog}/{dfes}/{annots}/{seeds}/sim_{chrms}.trees",
-            seeds=seed_array,
-            chrms=chrm_list,
-            dfes=dfe_list,
-            demog=demo_model_ids,
-            annots=annotation_list,
+        seeds=wildcards.seeds,
+        chrms=chrm_list,
+        dfes=wildcards.dfes,
+        demog=wildcards.demog,
+        annots=wildcards.annots,
             )
         # fix here to be able to run a list of selection items in one goal
         runner = stairway.StairwayPlotRunner(
@@ -208,9 +220,9 @@ def ne_files_sp(wildcards):
     return expand(output_dir + "/inference/sp/{demog}/{dfes}/{annots}/{seeds}/{chrms}/stairwayplot_estimated_Ne.txt",
         seeds=seed_array,
         chrms=chrm_list,
-        dfes=dfe_list,
-        demog=demo_model_ids,
-        annots=annotation_list,
+        dfes=wildcards.dfes,
+        demog=wildcards.demog,
+        annots=wildcards.annots,
     )
 
 
@@ -416,7 +428,7 @@ rule gone_clone:
         directory("ext/GONE")
     message:
         "cloning GONE repo"
-    threads: 20
+    threads: 1
     shell:
         """
         cd ext/
@@ -432,11 +444,10 @@ rule gone_params:
         ".params_edited"
     message:
         "specifying GONE params"
-    threads: 20
+    threads: 1
     run:
         prms = {"gone_phase":config["gone_phase"],
                 "gone_max_snps":config["gone_max_snps"],
-                "gone_threads":config["gone_threads"],
                 "gone_num_gens":config["gone_num_gens"],
                 "gone_num_bins":config["gone_num_bins"]}
         gone.params(gone_code, prms)
@@ -451,7 +462,7 @@ rule gone_copy:
         output_dir + "/inference/gone/{demog}/{dfes}/{annots}/{seeds}/{chrms}/.scripts_copied"
     message:
         "copying GONE scripts into individual working directories"
-    threads: 20
+    threads: 1
     run:
         print(output[0])
         outpath = "/".join(output[0].split("/")[:-1])
@@ -464,7 +475,7 @@ rule gone_prep_inputs:
     output:
         output_dir + "/inference/gone/{demog}/{dfes}/{annots}/{seeds}/{chrms}/gone.ped",
         output_dir + "/inference/gone/{demog}/{dfes}/{annots}/{seeds}/{chrms}/gone.map",
-    threads: 20
+    threads: 1
     run:
         genetic_map = species.get_genetic_map(genetic_map_id)
         if not genetic_map.is_cached():
@@ -485,7 +496,8 @@ rule gone_run:
         rules.gone_prep_inputs.output,
     output:
         output_dir + "/inference/gone/{demog}/{dfes}/{annots}/{seeds}/{chrms}/Output_Ne_gone",
-    threads: 20
+    threads: 8
+    resources: time=180
     shell:
         """
         cwd=$PWD
