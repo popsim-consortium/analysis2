@@ -15,10 +15,10 @@ def params(gone_code,params):
     with open(gone_code+"/INPUT_PARAMETERS_FILE") as params_file: text=params_file.readlines()
     text[4]=text[4].replace("PHASE=2","PHASE="+str(params['gone_phase']))
     text[7]=text[7].replace("NGEN=2000","NGEN="+str(params['gone_num_gens']))
-    text[8]=text[8].replace("NBIN=4002","NBIN="+str(params['gone_num_bins']))
+    text[8]=text[8].replace("NBIN=400","NBIN="+str(params['gone_num_bins']))
     text[12]=text[12].replace("maxNSNP=50000","maxNSNP="+str(params['gone_max_snps']))
-    text[15]=text[15].replace("threads=-99","threads="+str(params['gone_threads']))
-    with open(gone_code+"/INPUT_PARAMETERS_FILE","w") as params_file: 
+    # text[15]=text[15].replace("threads=-99","threads="+str(params['gone_threads']))
+    with open(gone_code+"/INPUT_PARAMETERS_FILE_TMP","w") as params_file: 
         for line in text:
             params_file.write(line)
 
@@ -30,7 +30,7 @@ def params(gone_code,params):
 
 def copy(gone_code,outpath,seed,threads):
     cwd = os.getcwd()
-    cmd =  "".join(["ln -sf ",cwd,"/",gone_code,"/INPUT_PARAMETERS_FILE ",
+    cmd =  "".join(["ln -sf ",cwd,"/",gone_code,"/INPUT_PARAMETERS_FILE_TMP ",
                     outpath,"/INPUT_PARAMETERS_FILE;\n\n"])
     cmd += "".join(["cat " + gone_code + "/script_GONE.sh | sed s/\"num=\$RANDOM\"/\"RANDOM=", seed,"\\nnum=\$RANDOM\"/g > ", outpath, "/script_GONE.sh;\n\n"])
     cmd += "".join(["mkdir ", outpath, "/PROGRAMMES;\n\n"])

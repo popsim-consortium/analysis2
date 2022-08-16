@@ -119,6 +119,7 @@ def plot_all_ne_estimates(sp_infiles, msmc_infiles, gone_infiles, outfile,
     for i, infile in enumerate(sp_infiles):
         nt = pd.read_csv(infile, sep="\t", skiprows=5)
         line2, = ax[0].plot(nt['year'], nt['Ne_median'], alpha=0.8)
+
         for j in range(0, len(nt["year"]), 2):
             outLines.append([nt["year"][j], nt["Ne_median"]
                             [j], "sp", "r" + str(i + 1)])

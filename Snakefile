@@ -11,7 +11,7 @@ Parameters are defined by the config.yaml file in
 workflows/config/snakemake/
 """
 
-configfile: "workflows/config/snakemake/tiny_config.yaml"
+configfile: "workflows/config/snakemake/config.yaml"
 
 
 module simulation_workflow:

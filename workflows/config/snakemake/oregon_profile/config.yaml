@@ -10,7 +10,7 @@ cluster:
                 --output=logs/{rule}/{rule}-{wildcards}-%j.out
 default-resources:
         - time=60
-        - mem_mb=5000
+        - mem_mb=12000
         - threads=1
 restart-times: 3
 max-jobs-per-second: 10
