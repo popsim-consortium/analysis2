@@ -22,6 +22,7 @@ def get_mask_from_file(mask_file, chromID):
     mask = np.array(mask.values[:, 1:3])
     return mask
 
+
 def get_mask_from_chrom_annotation(speciesID, chrom_annotation, chromID):
     """
     Get annotation intervals from the specified species/chrom/annotation.
@@ -67,6 +68,7 @@ def merged(intervals, *, closed: bool):
         yield start, end
 
     return list(iter_merged(intervals, closed=closed))
+
 
 def get_combined_masks(species, mask_file, chromID, chrom_annotation=None):
     """
