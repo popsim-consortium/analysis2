@@ -70,7 +70,7 @@ def generate_fs(ts, sample_sets, output, format, coding_intervals=None, mask_int
 
     Arguments:
         ts tskit.TreeSequence: A tree sequence.
-        intervals np.ndarray: Coding regsions used for generating frequency spectra.
+        intervals np.ndarray: Coding regions used for generating frequency spectra.
         mask_intervals np.ndarray: Intervals removed from tree-sequences.
         sample_sets numpy.ndarray: A sample list.
         output list: Names of output files.
