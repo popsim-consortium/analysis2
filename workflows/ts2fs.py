@@ -2,6 +2,7 @@ import dadi
 import numpy as np
 import tskit
 
+
 def _generate_fs_from_ts(ts, sample_sets=None):
     """
     Description:
@@ -61,13 +62,16 @@ def _generate_fs_from_ts(ts, sample_sets=None):
 
     return mut_afs
 
-def generate_fs(ts, sample_sets, output, format, is_folded=False, **kwargs):
+
+def generate_fs(ts, sample_sets, output, format, coding_intervals=None, mask_intervals=None, is_folded=False, **kwargs):
     """
     Description:
         Generates 1d site frequency spectra from tree sequences.
 
     Arguments:
         ts tskit.TreeSequence: A tree sequence.
+        intervals np.ndarray: Coding regions used for generating frequency spectra.
+        mask_intervals np.ndarray: Intervals removed from tree-sequences.
         sample_sets numpy.ndarray: A sample list.
         output list: Names of output files.
         format str: Format of output files. 
@@ -78,6 +82,11 @@ def generate_fs(ts, sample_sets, output, format, is_folded=False, **kwargs):
     # in a list to make it a list of sample setS
     #if not isinstance(sample_sets, list):
     #    sample_sets = [sample_sets]
+    if coding_intervals is not None:
+        ts = ts.keep_intervals(coding_intervals)
+    if mask_intervals is not None:
+        ts = ts.remove_intervals(mask_intervals)
+
     mut_afs = _generate_fs_from_ts(ts, sample_sets)
     neu_fs = mut_afs["neutral"]
     nonneu_fs = mut_afs["non_neutral"]
@@ -93,6 +102,7 @@ def generate_fs(ts, sample_sets, output, format, is_folded=False, **kwargs):
     elif format == 'DFE-alpha': _generate_dfe_alpha_fs(neu_fs, nonneu_fs, output, is_folded, **kwargs)
     elif format == 'grapes': _generate_grapes_fs(neu_fs, nonneu_fs, output, is_folded, **kwargs)
     else: raise Exception(f'{format} is not supported!')
+
 
 def _fold_fs(fs):
     """
@@ -112,6 +122,7 @@ def _fold_fs(fs):
   
     return folded_fs
 
+
 def _generate_dadi_fs(neu_fs, nonneu_fs, output):
     """
     Description:
@@ -127,6 +138,7 @@ def _generate_dadi_fs(neu_fs, nonneu_fs, output):
 
     neu_fs.to_file(output[0])
     nonneu_fs.to_file(output[1])
+
 
 def _generate_polydfe_fs(neu_fs, nonneu_fs, output, **kwargs):
     """
@@ -151,6 +163,7 @@ def _generate_polydfe_fs(neu_fs, nonneu_fs, output, **kwargs):
         o.write(f"1 1 {kwargs['sample_size']}\n")
         o.write(" ".join([str(round(f)) for f in neu_fs[1:-1]]) + " " + str(neu_len) + "\n")
         o.write(" ".join([str(round(f)) for f in nonneu_fs[1:-1]]) + " " + str(nonneu_len) + "\n")
+
 
 def _generate_dfe_alpha_fs(neu_fs, nonneu_fs, output, is_folded, **kwargs):
     """
@@ -237,6 +250,7 @@ def _generate_dfe_alpha_fs(neu_fs, nonneu_fs, output, is_folded, **kwargs):
         o.write(str(len(neu_fs)-1)+"\n")
         o.write(" ".join([str(round(f)) for f in nonneu_fs]) + "\n")
         o.write(" ".join([str(round(f)) for f in neu_fs]) + "\n")
+
 
 def _generate_grapes_fs(neu_fs, nonneu_fs, output, is_folded, **kwargs):
     """

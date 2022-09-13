@@ -8,6 +8,7 @@ import stdpopsim
 import tskit
 import ts2fs
 import plots
+import masks
 
 configfile: "workflows/config/snakemake/config.yaml"
 
@@ -27,8 +28,6 @@ output_dir = os.path.abspath(config["output_dir"])
 # The analysis species
 species = stdpopsim.get_species(config["species"])
 
-
-
 # The names of all chromosomes to simulate, separated by commas
 # Use "all" to simulate all chromsomes for the genome
 chrm_list = [chrom.id for chrom in species.genome.chromosomes]
@@ -38,6 +37,12 @@ if(config["chrm_list"] != "all"):
     chrm_list = [chr for chr in config["chrm_list"].split(",")]
 
 seed_list = np.random.random_integers(1,2**31,replicates)
+
+# mask
+try:
+    mask_file = config["mask_file"]
+except KeyError:
+    mask_file = None
 
 # polyDFE
 poly_dfe_exec = os.path.abspath(config["poly_dfe_exec"])
@@ -90,7 +95,17 @@ rule generate_dadi_fs:
         samps = ts.samples(population=index)
         if len(samps) == 0: samps = ts.samples(population=0)
 
-        ts2fs.generate_fs(ts, samps, output, format='dadi')
+        if mask_file is not None:
+            mask_intervals = masks.get_mask_from_file(mask_file, wildcards.chrms)
+        else:
+            mask_intervals = None
+
+        if (wildcards.annots != "all_sites") and (wildcards.annots != "none"):
+            annot = species.get_annotations(wildcards.annots)
+            annot_intervals = annot.get_chromosome_annotations(wildcards.chrms)
+            ts2fs.generate_fs(ts, samps, output, coding_intervals=annot_intervals, mask_intervals=mask_intervals, format='dadi')
+        else:
+            ts2fs.generate_fs(ts, samps, output, mask_intervals=mask_intervals, format='dadi')
 
 rule dadi_infer_dm:
     input: 
@@ -197,7 +212,22 @@ rule generate_polydfe_fs:
         if len(samps) == 0: samps = ts.samples(population=0)
         if len(samps) > 20: samps = samps[:20]
 
-        ts2fs.generate_fs(ts, samps, output, format='polyDFE', seq_len=seq_len, neu_prop=neu_prop, nonneu_prop=nonneu_prop, sample_size=len(samps))
+        if mask_file is not None:
+            mask_intervals = masks.get_mask_from_file(mask_file, wildcards.chrms)
+        else:
+            mask_intervals = None
+
+        if (wildcards.annots != "all_sites") and (wildcards.annots != "none"):
+            annot = species.get_annotations(wildcards.annots)
+            annot_intervals = annot.get_chromosome_annotations(wildcards.chrms)
+            exon_len = np.sum(annot_intervals[:,1]-annot_intervals[:,0])
+            ts2fs.generate_fs(ts, samps, output, coding_intervals=annot_intervals, 
+                              mask_intervals=mask_intervals, format='polyDFE', seq_len=exon_len, 
+                              neu_prop=neu_prop, nonneu_prop=nonneu_prop, sample_size=len(samps))
+        else:
+            ts2fs.generate_fs(ts, samps, output, mask_intervals=mask_intervals, 
+                              format='polyDFE', seq_len=seq_len, neu_prop=neu_prop, 
+                              nonneu_prop=nonneu_prop, sample_size=len(samps))
 
 rule run_polydfe:
     input: 
@@ -271,7 +301,25 @@ rule generate_dfe_alpha_fs:
         samps = ts.samples(population=index)
         if len(samps) == 0: samps = ts.samples(population=0)
 
-        ts2fs.generate_fs(ts, samps, output, format='DFE-alpha', is_folded=True, data_path_1=dfe_alpha_data_path_1, data_path_2=dfe_alpha_data_path_2, sfs_input_file=output[2], est_dfe_results_dir=params.output, est_dfe_demography_results_file=params.output+"/neu/est_dfe.out")
+        if mask_file is not None:
+            mask_intervals = masks.get_mask_from_file(mask_file, wildcards.chrms)
+        else:
+            mask_intervals = None
+
+        if (wildcards.annots != "all_sites") and (wildcards.annots != "none"):
+            annot = species.get_annotations(wildcards.annots)
+            annot_intervals = annot.get_chromosome_annotations(wildcards.chrms)
+            ts2fs.generate_fs(ts, samps, output, coding_intervals=annot_intervals, 
+                              mask_intervals=mask_intervals, format='DFE-alpha', is_folded=True, 
+                              data_path_1=dfe_alpha_data_path_1, data_path_2=dfe_alpha_data_path_2, 
+                              sfs_input_file=output[2], est_dfe_results_dir=params.output, 
+                              est_dfe_demography_results_file=params.output+"/neu/est_dfe.out")
+        else:
+            ts2fs.generate_fs(ts, samps, output, 
+                              mask_intervals=mask_intervals, format='DFE-alpha', is_folded=True, 
+                              data_path_1=dfe_alpha_data_path_1, data_path_2=dfe_alpha_data_path_2, 
+                              sfs_input_file=output[2], est_dfe_results_dir=params.output, 
+                              est_dfe_demography_results_file=params.output+"/neu/est_dfe.out")
 
 rule run_dfe_alpha:
     input:
@@ -333,7 +381,24 @@ rule generate_grapes_fs:
         header = species.common_name + " " + wildcards.chrms
         data_description = wildcards.annots
 
-        ts2fs.generate_fs(ts, samps, output, format='grapes', header=header, data_description=data_description, seq_len=seq_len, neu_prop=neu_prop, nonneu_prop=nonneu_prop, sample_size=len(samps))
+        if mask_file is not None:
+            mask_intervals = masks.get_mask_from_file(mask_file, wildcards.chrms)
+        else:
+            mask_intervals = None
+
+        if (wildcards.annots != "all_sites") and (wildcards.annots != "none"):
+            annot = species.get_annotations(wildcards.annots)
+            annot_intervals = annot.get_chromosome_annotations(wildcards.chrms)
+            exon_len = np.sum(annot_intervals[:,1]-annot_intervals[:,0])
+            ts2fs.generate_fs(ts, samps, output, coding_intervals=annot_intervals, 
+                              mask_intervals=mask_intervals, format='grapes', header=header, 
+                              data_description=data_description, seq_len=exon_len, 
+                              neu_prop=neu_prop, nonneu_prop=nonneu_prop, sample_size=len(samps))
+        else:
+            ts2fs.generate_fs(ts, samps, output, 
+                              mask_intervals=mask_intervals, format='grapes', header=header, 
+                              data_description=data_description, seq_len=seq_len, 
+                              neu_prop=neu_prop, nonneu_prop=nonneu_prop, sample_size=len(samps))
 
 rule run_grapes:
     input:
