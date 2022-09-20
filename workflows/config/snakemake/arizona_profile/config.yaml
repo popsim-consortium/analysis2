@@ -1,4 +1,5 @@
 cluster: 
+        mkdir -p logs_slurm/{rule} &&
         sbatch
                 --partition=high_priority
                 --account=rgutenk
@@ -6,10 +7,7 @@ cluster:
                 --mem-per-cpu={resources.mem_mb}
                 --time={resources.time}
                 --job-name=smk-{rule}-{wildcards}
-                -o logs_slurm/{rule}_{wildcards} 
-                -e logs_slurm/{rule}_{wildcards} 
-                --mail-type=FAIL 
-                --export=ALL,LD_LIBRARY_PATH=/xdisk/rgutenk/xinhuang/software/gsl-2.7/build/lib/
+                --output=logs_slurm/{rule}/{rule}-{wildcards}-%j
 
 default-resources:
         - time=60
