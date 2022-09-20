@@ -73,8 +73,9 @@ rule simulation:
 
         genetic_map_id = config["genetic_map"]
         contig = species.get_contig(wildcards.chrms, genetic_map=genetic_map_id)
-        contig.clear_dfes()
-        dfe = species.get_dfe(wildcards.dfes)
+        if wildcards.dfes != "none":
+            # Load dfe only if provided
+            dfe = species.get_dfe(wildcards.dfes)
         if wildcards.annots == "all_sites":
             # Adding selection to the whole contig
             contig.add_dfe(intervals=np.array([[0, int(contig.length)]]), DFE=dfe)

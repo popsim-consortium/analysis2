@@ -1,0 +1,50 @@
+"seed": 12345
+"population_id": 0
+"replicates": 3
+
+"species": "HomSap"
+
+"demo_models":
+    [
+        { 
+            "id": "Constant", 
+            "num_samples_per_population": [10],
+        },
+        {
+            "id": "OutOfAfrica_3G09",
+            "num_samples_per_population": [10, 10, 10],
+        },
+    ]
+
+"genetic_map": "HapMapII_GRCh37"
+"chrm_list": "chr21"
+"dfe_list": ["none"]
+"output_dir": "results"
+"mask_file": "workflows/masks/HapmapII_GRCh37.mask.bed"
+
+# slim settings
+"slim_scaling_factor": 10
+"slim_burn_in": 10
+
+# n(t) specific configs
+
+"num_sampled_genomes_msmc": [2]
+"num_sampled_genomes_per_replicate": [2]
+"num_msmc_iterations": 3
+
+"annotation_list": ["none"]
+"gone_phase": 1 # 0 for pseudohaploid, 1 for unknown phase, 2 for phased
+"gone_max_snps": 50000 # default=50000
+"gone_num_gens": 2000 # default=2000
+"gone_num_bins": 400 # default=400
+
+# exe paths
+"poly_dfe_exec": "ext/polyDFE/polyDFE-2.0-linux-64-bit"
+"dfe_alpha_exec": "ext/dfe-alpha-release-2.16/est_dfe"
+"dfe_alpha_data_path_1": "ext/dfe-alpha-release-2.16/data"
+"dfe_alpha_data_path_2": "three-epoch"
+"grapes_exec": "ext/grapes/multi_grapes"
+
+"msmc_exec": "ext/msmc2/build/release/msmc2"
+"stairwayplot_code": "ext/stairwayplot/swarmops.jar"
+"gone_code": "ext/GONE/Linux"
