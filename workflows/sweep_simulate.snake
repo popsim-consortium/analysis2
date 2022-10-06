@@ -1,0 +1,433 @@
+"""
+Snakefile for running sweeps benchmark on stdpopsim.
+"""
+import os
+import numpy as np
+import pandas as pd
+import tskit
+import stdpopsim
+import math
+from scipy.optimize import root_scalar
+
+configfile: "workflows/config/snakemake/sweep_config.yaml"
+
+
+rng = np.random.default_rng(seed=config["seed"])
+rng2 = np.random.default_rng(seed=config["seed"]+1)
+# ###############################################################################
+# GENERAL RULES & GLOBALS
+# ###############################################################################
+
+# The number of replicates of each analysis you would like to run
+replicates = config["replicates"]
+# Where you would like all output files from analysis to live
+output_dir = os.path.abspath(config["output_dir"])
+
+# The analysis species
+species = stdpopsim.get_species(config["species"])
+
+# The name of the chromosome to simulate
+chrom = config["chrom"]
+
+# The genetic map to use
+genetic_map_id = config["genetic_map"]
+
+# Getting starting position for sweep windows
+rel_win_start = np.linspace(0, 1.0, config["num_windows"], endpoint=False)
+
+# Shift/scale windows from unit coordinates to
+# [start of recombination map, chromosome length]
+# where "start of recombination map" means the first interval with data.
+# NB: this will change simulation coordinates depending on genetic map!
+recmap = species.get_contig(chrom, genetic_map=genetic_map_id).recombination_map
+min_coord = np.min(recmap.position[:-1][~np.isnan(recmap.rate)]) # getting the position after nans
+max_coord = recmap.left[np.where(recmap.rate == 0)[0][-1]-1] # getting the leftmost position before 0 map
+win_start = min_coord + (max_coord - min_coord - config["focal_size"]) * rel_win_start
+win_end = win_start + config["focal_size"] 
+windows = np.column_stack((win_start,win_end)) 
+#windows = windows[~np.any(windows>max_coord, axis=1),:]
+windows = np.floor(windows)
+
+# Grid of selection coeffs and sweep start times
+coeffs_dict = config["coeffs"]
+
+
+sel_coeffs = np.linspace(*coeffs_dict["bounds"], coeffs_dict["grid_size"])
+
+
+seed_array = rng.integers(1,2**31,replicates)
+seed2_array = rng2.integers(1,2**31,config["boundary_reps"])
+
+# The specific demographic model you would like to run
+demo_model = config["demo_model"]
+#import pdb; pdb.set_trace()
+pop_list = []
+for popname, n in demo_model["samples"].items():
+    if n > 0:
+        pop_list.append(popname)
+#pop_list = [popname if n > 0 for popname, n in demo_model["samples"].items()] 
+# Simulate across multiple DFEs/annotations
+dfe_list = config["dfe_list"]
+annotation_list = config["annotation_list"]
+
+# Region size 
+region_size = config["region_size"]
+
+def genetic_distance(ratemap, x, x0=0):
+    """
+    Function that returns the genetic distance (in cM) between positions x and 
+    x0 based on a msprime.RateMap with recombination rates.
+    """
+    return 100*(ratemap.get_cumulative_mass(x) - ratemap.get_cumulative_mass(x0))
+
+
+def make_buffer(gmap, cM, left, right):
+    """
+    This function adds a buffer zone to the interval [left, right] of fixed genetic distance cM
+    and returns the physical positions of the buffered interval.
+    The buffered intervals are bounded by the size of the genetic map gmap.
+    """
+    assert right > left
+    assert left >= 0
+    assert right <= gmap.sequence_length
+    # this is gonna fail in the beginning and ends of chroms bc of nans and 0s in ratemap
+    try:
+        left = root_scalar(
+            lambda y: genetic_distance(ratemap=gmap, x=left, x0=y) - cM,
+            method='bisect',
+            bracket=[0, gmap.sequence_length],
+        )
+        left = left.root
+    except:
+        left = 0
+    try:
+        right = root_scalar(
+            lambda y: genetic_distance(ratemap=gmap, x=y, x0=right) - cM,
+            method='bisect',
+            bracket=[0, gmap.sequence_length],
+        )
+        right = right.root
+    except:
+        right = gmap.sequence_length
+    return left, right
+
+def add_window_metadata(ts, window_left, window_right, window_bleft, window_bright, extra=None):
+    if extra is None:
+        extra = ""
+    tables = ts.dump_tables()
+    metadata = tables.metadata
+    new_metadata = {
+        "windowing":
+            {
+                "window_left": window_left,
+                "window_bleft": window_bleft,
+                "window_right": window_right,
+                "window_bright": window_bright,
+            },
+        "extra":extra
+    }
+    metadata.update(new_metadata)
+    tables.metadata = metadata
+    return tables.tree_sequence()
+
+def compute_stats(ts, sample_sets):
+    offset = ts.metadata['windowing']['window_bleft']
+    windows_bpoints = np.array([ts.metadata['windowing']['window_bleft']-offset,
+                                ts.metadata['windowing']['window_left']-offset,
+                                ts.metadata['windowing']['window_right']-offset,
+                                ts.metadata['windowing']['window_bright']-offset], dtype=np.int32)
+    # removing duplicates if bleft and left are the same or brighta and right
+    windows_bpoints = np.unique(windows_bpoints)
+    # something wonky happening with float conversion
+    if windows_bpoints[-1] == ts.sequence_length - 1:
+        windows_bpoints[-1] = ts.sequence_length
+    assert (windows_bpoints.shape == (2,)) or windows_bpoints.shape == (4,)
+    taj=ts.Tajimas_D(sample_sets=sample_sets, windows=windows_bpoints,mode="site")
+    focal_taj = taj[len(taj)//2, :] 
+    return focal_taj, taj
+
+# ###############################################################################
+# GENERAL RULES & GLOBALS
+# ###############################################################################
+
+boundary_outs = [output_dir +f"/simulated_data/sweeps/boundary_sims/sim_{seed}_{config['region_size']}.trees"
+    for seed in seed2_array
+]
+
+neutral_outs_prefix = [output_dir + f"/simulated_data/sweeps/neutral/{demo_model['id']}/{seed}/sim_{chrom}_{left:.0f}_{right:.0f}"
+    for left, right in windows
+    for seed in seed_array
+]
+
+bgs_outs_prefix = [output_dir + f"/simulated_data/sweeps/bgs/{demo_model['id']}/{annot}/{dfe}/{seed}/sim_{chrom}_{left:.0f}_{right:.0f}"
+    for left, right in windows
+    for seed in seed_array
+    for dfe in dfe_list
+    for annot in annotation_list
+]
+
+sw_outs_prefix = [output_dir +  f"/simulated_data/sweeps/sweep/{demo_model['id']}/{popu}/{annot}/{dfe}/{coeff}/{seed}/sim_{chrom}_{left:.0f}_{right:.0f}"
+    for left, right in windows
+    for seed in seed_array
+    for dfe in dfe_list
+    for annot in annotation_list
+    for coeff in sel_coeffs
+    for popu in pop_list
+] + [output_dir +  f"/simulated_data/sweeps/sweep/{demo_model['id']}/{popu}/NA/NA/{coeff}/{seed}/sim_{chrom}_{left:.0f}_{right:.0f}"
+    for left, right in windows
+    for seed in seed_array
+    for coeff in sel_coeffs
+    for popu in pop_list
+]
+
+trees_outs = [file_prefix+".trees" for file_prefix in neutral_outs_prefix + bgs_outs_prefix + sw_outs_prefix]
+stats_outs = [file_prefix+".stats.tsv" for file_prefix in neutral_outs_prefix + bgs_outs_prefix + sw_outs_prefix]
+
+rule all:
+    input:
+        boundary_outs + trees_outs + stats_outs + [output_dir + f'/simulated_data/sweeps/all_sims.stats.tsv']
+
+rule boundary_sims:
+    input:
+    output:
+        output_dir + "/simulated_data/sweeps/boundary_sims/sim_{seed}_{region_size}.trees"
+    resources: time=6000, mem_mb=16000
+    run:
+        model = species.get_demographic_model(demo_model["id"])
+        mut_rate = model.mutation_rate 
+        # Use new sample specification, give selected pop and sample size as config arguments
+        samples = demo_model["samples"]
+        dfe = species.get_dfe(dfe_list[0])
+        # reducing number of del muts bc it's too much!
+        dfe.proportions = [1-(0.7*0.25), 0.7*0.25]
+        clen = int(wildcards.region_size)
+        contig = species.get_contig(length=clen)
+        contig.add_dfe(intervals=[[0, clen]], DFE=dfe)# applying DFE over some equally spaced 
+        contig.mutation_rate = mut_rate
+        engine = stdpopsim.get_engine("slim")
+        ts = engine.simulate(
+            model,
+            contig,
+            samples,
+            slim_scaling_factor=config["slim_scaling_factor"],
+            slim_burn_in=config["slim_burn_in"],
+            seed=int(wildcards.seed),
+        )
+        ts.dump(output[0])
+
+rule neutral:
+    input:
+    output:
+        output_dir + f"/simulated_data/sweeps/neutral/{demo_model['id']}/{{seed}}/sim_{chrom}_{{left}}_{{right}}.trees", 
+    resources: time=3000, mem_mb=2000
+    run:
+        model = species.get_demographic_model(demo_model["id"])
+        mutation_rate = model.mutation_rate
+        extended_events = None
+        # Use new sample specification, give selected pop and sample size as config arguments
+        samples = demo_model["samples"]
+
+        # Extract contig spanning window of chromosome
+        window_left = int(wildcards.left)
+        window_right = int(wildcards.right)
+        contig = species.get_contig(chrom, genetic_map=genetic_map_id, left=window_left, right=window_right)
+
+        contig.mutation_rate = mutation_rate
+        engine = stdpopsim.get_engine("slim")
+        ts = engine.simulate(
+            model,
+            contig,
+            samples,
+            extended_events=extended_events,
+            slim_scaling_factor=config["slim_scaling_factor"],
+            slim_burn_in=config["slim_burn_in"],
+            seed=int(wildcards.seed),
+        )
+        ts = add_window_metadata(ts, window_left, window_right, window_left, window_right)
+        ts.dump(output[0])
+
+rule bgs:
+    input:
+    output:
+        output_dir + f"/simulated_data/sweeps/bgs/{demo_model['id']}/{{annot}}/{{dfe}}/{{seed}}/sim_{chrom}_{{left}}_{{right}}.trees", 
+    resources: time=3000, mem_mb=4000
+    run:
+        model = species.get_demographic_model(demo_model["id"])
+        mutation_rate = model.mutation_rate
+        extended_events = None
+        # Use new sample specification, give selected pop and sample size as config arguments
+        samples = demo_model["samples"]
+
+        # Extract contig spanning window of chromosome
+        window_left = int(wildcards.left)
+        window_right = int(wildcards.right)
+        b_window_left, b_window_right = make_buffer(recmap, config["buffer_cM"], window_left, window_right)
+        contig = species.get_contig(chrom, genetic_map=genetic_map_id, left=b_window_left, right=b_window_right)
+
+        dfe = species.get_dfe(wildcards.dfe)
+
+        ## Adding annotation only seletion on exon region
+        annot = species.get_annotations(wildcards.annot)
+        annot_intervals = annot.get_chromosome_annotations(chrom)
+        contig.add_dfe(intervals=annot_intervals, DFE=dfe)
+        contig.mutation_rate = mutation_rate
+        engine = stdpopsim.get_engine("slim")
+        ts = engine.simulate(
+            model,
+            contig,
+            samples,
+            extended_events=extended_events,
+            slim_scaling_factor=config["slim_scaling_factor"],
+            slim_burn_in=config["slim_burn_in"],
+            seed=int(wildcards.seed),
+        )
+        ts = add_window_metadata(ts, window_left, window_right, b_window_left, b_window_right)
+        ts.dump(output[0])
+
+rule sweep:
+    input:
+    output:
+        output_dir + f"/simulated_data/sweeps/sweep/{demo_model['id']}/{{popu}}/{{annot}}/{{dfe}}/{{coeff}}/{{seed}}/sim_{{chrom}}_{{left}}_{{right}}.trees", 
+    resources: time=3000, mem_mb=4000
+    run:
+        model = species.get_demographic_model(demo_model["id"])
+        mutation_rate = model.mutation_rate
+        extended_events = None
+        # Use new sample specification, give selected pop and sample size as config arguments
+        samples = demo_model["samples"]
+
+        # Extract contig spanning window of chromosome
+        window_left = int(wildcards.left)
+        window_right = int(wildcards.right)
+        b_window_left, b_window_right = make_buffer(recmap, config["buffer_cM"], window_left, window_right)
+        contig = species.get_contig(chrom, genetic_map=genetic_map_id, left=b_window_left, right=b_window_right)
+        if wildcards.dfe != "NA":
+            dfe = species.get_dfe(wildcards.dfe)
+
+            ## Adding annotation only seletion on exon region
+            annot = species.get_annotations(wildcards.annot)
+            annot_intervals = annot.get_chromosome_annotations(chrom)
+            contig.add_dfe(intervals=annot_intervals, DFE=dfe)
+
+        # sweep parameters
+        coord = ((window_left+window_right)//2) # the API does the right thing even if it is chunked
+        coeff = float(wildcards.coeff)
+        # Defining how long ago beneficial mutations arise
+        # First getting 2N from the model and pop
+        debug = model.model.debug()
+        coal_T = debug.mean_coalescence_time({wildcards.popu: 2})
+        gamma = coal_T* coeff #2Ns
+        # TODO: check this is not off by a factor of two
+        T_f = 4 * (np.log(gamma) + 0.5772 - (1/gamma)) / coeff # this is from Charlesworth 2020/Pennings and Hermisson 2007
+        time = np.floor(1.5*T_f) # I dilated the time a bit because of variance (don't want to lose too many sims due to this -- note we are conditioning on sweep_min_freq)
+        print(coal_T, gamma, T_f, time)
+        contig.add_single_site("sweep", coordinate=coord)
+        extended_events = stdpopsim.ext.selective_sweep(
+            "sweep",
+            population=wildcards.popu, #selected pop
+            selection_coeff=coeff,
+            mutation_generation_ago=time,
+            min_freq_at_end=config["sweep_min_freq"]
+        )
+        
+        contig.mutation_rate = mutation_rate
+        engine = stdpopsim.get_engine("slim")
+        ts = engine.simulate(
+            model,
+            contig,
+            samples,
+            extended_events=extended_events,
+            slim_scaling_factor=config["slim_scaling_factor"],
+            slim_burn_in=config["slim_burn_in"],
+            seed=int(wildcards.seed),
+        )
+        ts = add_window_metadata(ts, window_left, window_right, b_window_left, b_window_right, extra=f"sweep_time={time};")
+        ts.dump(output[0])
+
+def _get_stats(input, output, params_dict, target_pops):
+    meta = ["model","demo","seed","chrom","left","right","annot","dfe","coeff"]
+    stats = ["taj"]
+    header = "\t".join(meta+['pop']+stats)
+    meta_str = "\t".join([params_dict[m] for m in meta])
+    ts = tskit.load(input[0])
+    all_pops_in_ts = [pop.metadata['name'] for pop in ts.populations()]
+    if target_pops is None:
+        target_pops = pop_list
+    sample_sets = [ts.samples(population=all_pops_in_ts.index(pop)) for pop in target_pops]
+    fh = open(output[0], 'w')
+    focal_taj, _ = compute_stats(ts, sample_sets)
+    assert focal_taj.shape == (len(target_pops),)
+    print(f'{header}', file=fh, flush=True)
+    for t,p in zip(focal_taj,target_pops):
+        print(f'{meta_str}\t{p}\t{t}', file=fh, flush=True)
+    fh.close()
+
+rule get_stats:
+    input: output_dir + '/simulated_data/sweeps/{middle}/sim_{chrom}_{left}_{right}.trees'
+    output:
+        output_dir + "/simulated_data/sweeps/{middle}/sim_{chrom}_{left}_{right}.stats.tsv", 
+    resources: time=3000, mem_mb=2000
+    run:
+        target_pops = None
+        params_list = wildcards.middle.split("/")
+        model = params_list[0]
+        demo = params_list[1]
+        seed = params_list[-1]
+        params_dict = {
+                        "model":model,
+                        "demo":demo,
+                        "seed":seed,
+                        "annot":"NA",
+                        "dfe":"NA",
+                        "coeff":"NA",
+                        "chrom": wildcards.chrom,
+                        "left": wildcards.left,
+                        "right": wildcards.right
+                    }
+        assert model in ["neutral", "bgs", "sweep"]
+        if model == "bgs":
+            params_dict["annot"] = params_list[2]
+            params_dict["dfe"] = params_list[3]
+        if model == "sweep":
+            target_pops = [params_list[2]]
+            params_dict["annot"] = params_list[3]
+            params_dict["dfe"] = params_list[4]
+            params_dict["coeff"] = params_list[5]
+        _get_stats(input, output, params_dict, target_pops)
+
+rule merge_stats:
+    input: stats_outs
+    output:
+        output_dir + f'/simulated_data/sweeps/all_sims.stats.tsv'
+    resources: time=3000, mem_mb=16000, disk_mb=16000
+    run:
+        #print(input, flush=True)
+        #import pdb; pdb.set_trace()
+        df = pd.concat(map(lambda x: pd.read_csv(x, sep="\t"), input))
+        df.to_csv(output[0], sep="\t", index=False)
+"""
+rule get_neut_stats:
+    input:
+        output_dir + f"/simulated_data/sweeps/neutral/{{seed}}/sim_{chrom}_{{left}}_{{right}}.trees", 
+    output:
+        output_dir + f"/simulated_data/sweeps/neutral/{{seed}}/sim_{chrom}_{{left}}_{{right}}.stats.tsv", 
+    resources: time=3000, mem_mb=2000
+    run:
+        _get_stats(input, output, wildcards, model="neutral")
+rule get_bgs_stats:
+    input:
+        output_dir + f"/simulated_data/sweeps/bgs/{{annot}}/{{dfe}}/{{seed}}/sim_{chrom}_{{left}}_{{right}}.trees", 
+    output:
+        output_dir + f"/simulated_data/sweeps/bgs/{{annot}}/{{dfe}}/{{seed}}/sim_{chrom}_{{left}}_{{right}}.stats.tsv", 
+    resources: time=3000, mem_mb=2000
+    run:
+        _get_stats(input, output)
+rule get_sw_stats:
+    input:
+        output_dir + f"/simulated_data/sweeps/sweep/{{annot}}/{{dfe}}/{{coeff}}/{{time}}/{{seed}}/sim_{chrom}_{{left}}_{{right}}.trees", 
+    output:
+        output_dir + f"/simulated_data/sweeps/sweep/{{annot}}/{{dfe}}/{{coeff}}/{{time}}/{{seed}}/sim_{chrom}_{{left}}_{{right}}.stats.tsv", 
+    resources: time=3000, mem_mb=2000
+    run:
+        _get_stats(input, output)
+"""
