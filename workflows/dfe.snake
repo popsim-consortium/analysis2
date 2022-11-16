@@ -123,9 +123,9 @@ rule dadi_infer_dm:
     threads: 8
     shell:
         """
-        dadi-cli InferDM --fs {input} --model {params.demog} --p0 {params.demog_p0} --ubounds {params.demog_ubounds} --lbounds {params.demog_lbounds} --output-prefix {params.prefix} --optimizations {params.opts} --grids {params.grid_size} --threads {threads}
+        dadi-cli InferDM --fs {input} --model {params.demog} --p0 {params.demog_p0} --ubounds {params.demog_ubounds} --lbounds {params.demog_lbounds} --output-prefix {params.prefix} --optimizations {params.opts} --grids {params.grid_size} --cpus {threads} --nomisid
 
-        dadi-cli BestFit --input-prefix {params.prefix}.InferDM --model {params.demog} --ubounds {params.demog_ubounds} --lbounds {params.demog_lbounds}
+        dadi-cli BestFit --input-prefix {params.prefix}.InferDM --ubounds {params.demog_ubounds} --lbounds {params.demog_lbounds}
         """
 
 rule dadi_generate_cache:
@@ -134,14 +134,14 @@ rule dadi_generate_cache:
     output:
         output_dir + "/inference/{demog}/dadi/{dfes}/{annots}/{seeds}/{chrms}/pop{ids}/pop{ids}.two_epoch.spectra.bpkl"
     params:
-        demog = 'two_epoch',
+        demog = 'two_epoch_sel',
         sample_size = 10,
         grid_size = '800 1000 1200',
         gamma_pts = 2000
     threads: 8
     shell:
         """
-        dadi-cli GenerateCache --model {params.demog} --demo-popt {input} --sample-size {params.sample_size} --output {output} --mp --grids {params.grid_size} --gamma-pts {params.gamma_pts}
+        dadi-cli GenerateCache --model {params.demog} --demo-popt {input} --sample-size {params.sample_size} --output {output} --grids {params.grid_size} --gamma-pts {params.gamma_pts} --cpus {threads}
         """
 
 rule dadi_infer_dfe:
@@ -150,9 +150,9 @@ rule dadi_infer_dfe:
         output_dir + "/inference/{demog}/dadi/{dfes}/{annots}/{seeds}/{chrms}/pop{ids}/pop{ids}.two_epoch.spectra.bpkl",
         output_dir + "/inference/{demog}/dadi/{dfes}/{annots}/{seeds}/{chrms}/pop{ids}/pop{ids}.two_epoch.InferDM.bestfits"
     output:
-        output_dir + "/inference/{demog}/dadi/{dfes}/{annots}/{seeds}/{chrms}/pop{ids}/pop{ids}.two_epoch.gamma.InferDFE.bestfits"
+        output_dir + "/inference/{demog}/dadi/{dfes}/{annots}/{seeds}/{chrms}/pop{ids}/pop{ids}.two_epoch.gamma.InferDFE.bestfits",
+        output_dir + "/inference/{demog}/dadi/{dfes}/{annots}/{seeds}/{chrms}/pop{ids}/pop{ids}.two_epoch.gamma.log"
     params:
-        demog = 'two_epoch',
         dfe = 'gamma',
         dfe_p0 = '0.5 1000',
         dfe_lbounds = '0 0',
@@ -163,9 +163,9 @@ rule dadi_infer_dfe:
     threads: 8
     shell:
         """
-        dadi-cli InferDFE --fs {input[0]} --cache1d {input[1]} --demo-popt {input[2]} --output-prefix {params.prefix} --pdf1d {params.dfe} --p0 {params.dfe_p0} --ubounds {params.dfe_ubounds} --lbounds {params.dfe_lbounds} --ratio {params.ratio} --optimizations {params.opts} --threads {threads}
+        dadi-cli InferDFE --fs {input[0]} --cache1d {input[1]} --demo-popt {input[2]} --output-prefix {params.prefix} --pdf1d {params.dfe} --p0 {params.dfe_p0} --ubounds {params.dfe_ubounds} --lbounds {params.dfe_lbounds} --ratio {params.ratio} --optimizations {params.opts} --cpus {threads} --nomisid &>> {params.prefix}.log
 
-        dadi-cli BestFit --input-prefix {params.prefix}.InferDFE --pdf {params.dfe} --ubounds {params.dfe_ubounds} --lbounds {params.dfe_lbounds} --model {params.demog}
+        dadi-cli BestFit --input-prefix {params.prefix}.InferDFE --ubounds {params.dfe_ubounds} --lbounds {params.dfe_lbounds} &>> {params.prefix}.log
         """
 
 rule get_dadi_dfe_bestfits:
