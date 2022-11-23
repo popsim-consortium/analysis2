@@ -151,7 +151,6 @@ rule dadi_infer_dfe:
         output_dir + "/inference/{demog}/dadi/{dfes}/{annots}/{seeds}/{chrms}/pop{ids}/pop{ids}.two_epoch.InferDM.bestfits"
     output:
         output_dir + "/inference/{demog}/dadi/{dfes}/{annots}/{seeds}/{chrms}/pop{ids}/pop{ids}.two_epoch.gamma.InferDFE.bestfits",
-        output_dir + "/inference/{demog}/dadi/{dfes}/{annots}/{seeds}/{chrms}/pop{ids}/pop{ids}.two_epoch.gamma.log"
     params:
         dfe = 'gamma',
         dfe_p0 = '0.5 1000',
