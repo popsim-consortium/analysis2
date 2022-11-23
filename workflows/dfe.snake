@@ -125,7 +125,6 @@ rule dadi_infer_dm:
         """
         dadi-cli InferDM --fs {input} --model {params.demog} --p0 {params.demog_p0} --ubounds {params.demog_ubounds} --lbounds {params.demog_lbounds} --output-prefix {params.prefix} --optimizations {params.opts} --grids {params.grid_size} --cpus {threads} --nomisid --force-convergence
 
-        dadi-cli BestFit --input-prefix {params.prefix}.InferDM --ubounds {params.demog_ubounds} --lbounds {params.demog_lbounds}
         """
 
 rule dadi_generate_cache:
