@@ -162,7 +162,7 @@ rule dadi_infer_dfe:
     threads: 8
     shell:
         """
-        dadi-cli InferDFE --fs {input[0]} --cache1d {input[1]} --demo-popt {input[2]} --output-prefix {params.prefix} --pdf1d {params.dfe} --p0 {params.dfe_p0} --ubounds {params.dfe_ubounds} --lbounds {params.dfe_lbounds} --ratio {params.ratio} --optimizations {params.opts} --cpus {threads} --nomisid &>> {params.prefix}.log
+        dadi-cli InferDFE --fs {input[0]} --cache1d {input[1]} --demo-popt {input[2]} --output-prefix {params.prefix} --pdf1d {params.dfe} --p0 {params.dfe_p0} --ubounds {params.dfe_ubounds} --lbounds {params.dfe_lbounds} --ratio {params.ratio} --optimizations {params.opts} --cpus {threads} --nomisid --force-convergence
 
         dadi-cli BestFit --input-prefix {params.prefix}.InferDFE --ubounds {params.dfe_ubounds} --lbounds {params.dfe_lbounds} &>> {params.prefix}.log
         """
