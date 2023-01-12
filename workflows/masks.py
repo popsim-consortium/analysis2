@@ -16,6 +16,18 @@ def get_mask_from_file(mask_file, chromID):
     :chromID: chromosome ID
     """
     mask_table = pd.read_csv(mask_file, sep="\t", header=None)
+    mask = [mask_table[mask_table[0] == chrom] for chrom in chromID]
+    mask = [np.array(m.values[:, 1:3]) for m in mask]
+    return mask
+
+
+def get_mask_from_file_dfe(mask_file, chromID):
+    """
+    Get the mask for a specific chromosome from the specified file.
+    :mask_file: path to the mask file
+    :chromID: chromosome ID
+    """
+    mask_table = pd.read_csv(mask_file, sep="\t", header=None)
     # get the mask for the specified chromosome
     mask = mask_table[mask_table[0] == chromID]
     # turn into a numpy array
@@ -33,7 +45,7 @@ def get_mask_from_chrom_annotation(speciesID, chrom_annotation, chromID):
     """
     species = stdpopsim.get_species(speciesID)
     a = species.get_annotations(chrom_annotation)
-    mask = a.get_chromosome_annotations(chromID)
+    mask = [a.get_chromosome_annotations(chrom) for chrom in chromID]
     return mask
 
 
@@ -80,18 +92,27 @@ def get_combined_masks(species, mask_file, chromID, chrom_annotation=None):
     :chrom_annotation: chromosome annotation name (e.g., "ensembl_havana_104_CDS"),
     if set to None, the mask will be obtained from the mask_file only
     """
+    if type(chromID) is list:
+        chromID = list(dict.fromkeys(chromID))
+    else:
+        chromID = [chromID]
     if mask_file is None and chrom_annotation is None:
-        return None
+        if len(chromID) < 2:
+            return None
+        else:
+            return [None] * len(chromID)
     # get the mask for the specified chromosome
     if mask_file is not None:
         mask = get_mask_from_file(mask_file, chromID)
     else:
         mask = np.array([], dtype=int).reshape(0, 2)
+    # get annotations for chrom
     if chrom_annotation is not None:
         an_mask = get_mask_from_chrom_annotation(species, chrom_annotation, chromID)
-        mask = np.concatenate((mask, an_mask))
+        mask = [np.concatenate((m, am)) for m, am in zip(mask, an_mask)]
     # merge overlapping and adjacent intervals
-    mask = merged(mask, closed=True)
-    # turn into a numpy array
-    mask = np.array(mask)
-    return mask 
+    mask = [np.array(merged(m, closed=True)) for m in mask]
+    if len(mask) < 2:
+        # remove from list for fxs that only handle 1 chrm
+        mask = mask[0]
+    return mask

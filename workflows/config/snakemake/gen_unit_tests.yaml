@@ -1,20 +1,26 @@
 "seed": 12345
-"population_id": [0]
-"replicates": 2
+"population_id": 0
+"replicates": 3
 
 "species": "HomSap"
+
 "demo_models":
     [
-    {"id":"OutOfAfrica_3G09",
-    "num_samples_per_population": [20,20,20],
-    }
+        { 
+            "id": "Constant", 
+            "num_samples_per_population": [20],
+        },
+        {
+            "id": "OutOfAfrica_3G09",
+            "num_samples_per_population": [20, 20, 20],
+        },
     ]
 
 "genetic_map": "HapMapII_GRCh37"
-"chrm_list": "chr3,chr10,chr21"
+"chrm_list": "chr10,chr21"
 "dfe_list": ["none", "Gamma_H17"]
 "annotation_list": ["none", "ensembl_havana_104_exons"]
-"output_dir": "results"
+"output_dir": "results_tests"
 
 "mask_file": "workflows/masks/HapmapII_GRCh37.mask.bed"
 # set any of the below to 'none' to skip annot masking
@@ -30,15 +36,15 @@
 # n(t) specific configs
 "methods" : ["stairwayplot", "gone", "smcpp", "msmc"]
 
-"num_sampled_genomes_msmc" : [6]
+"num_sampled_genomes_msmc" : [2, 4]
 "num_sampled_genomes_per_replicate": [2]  # I dont use this, not sure what is purpose?
-"num_msmc_iterations" : 20
+"num_msmc_iterations" : 10
 
 "gone_phase" : 1  # 0 for pseudohaploid, 1 for phased, 2 for unknown phase
-"gone_max_snps" : 50000  # default=50000
+"gone_max_snps" : 5000  # default=50000
 "gone_threads" : 8
-"gone_num_gens" : 2000  # default=2000
-"gone_num_bins" : 400  # default=400
+"gone_num_gens" : 200  # default=2000
+"gone_num_bins" : 100  # default=400
 
 # exe paths
 "poly_dfe_exec": "ext/polyDFE/polyDFE-2.0-linux-64-bit"
