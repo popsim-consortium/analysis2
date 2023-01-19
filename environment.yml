@@ -24,7 +24,7 @@ dependencies:
   - gfortran
   - blas
   - gsl
-  - dadi
+  - dadi==2.2.0
   - mamba
   - openjdk
   - pip:
