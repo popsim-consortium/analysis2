@@ -85,7 +85,7 @@ def generate_fs(ts, sample_sets, output, format, coding_intervals=None, mask_int
     if coding_intervals is not None:
         ts = ts.keep_intervals(coding_intervals)
     if mask_intervals is not None:
-        ts = ts.remove_intervals(mask_intervals)
+        ts = ts.delete_intervals(mask_intervals)
 
     mut_afs = _generate_fs_from_ts(ts, sample_sets)
     neu_fs = mut_afs["neutral"]
