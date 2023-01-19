@@ -123,9 +123,8 @@ rule dadi_infer_dm:
     threads: 8
     shell:
         """
-        dadi-cli InferDM --fs {input} --model {params.demog} --p0 {params.demog_p0} --ubounds {params.demog_ubounds} --lbounds {params.demog_lbounds} --output-prefix {params.prefix} --optimizations {params.opts} --grids {params.grid_size} --cpus {threads} --nomisid
+        dadi-cli InferDM --fs {input} --model {params.demog} --p0 {params.demog_p0} --ubounds {params.demog_ubounds} --lbounds {params.demog_lbounds} --output-prefix {params.prefix} --optimizations {params.opts} --grids {params.grid_size} --cpus {threads} --nomisid --force-convergence
 
-        dadi-cli BestFit --input-prefix {params.prefix}.InferDM --ubounds {params.demog_ubounds} --lbounds {params.demog_lbounds}
         """
 
 rule dadi_generate_cache:
@@ -151,7 +150,6 @@ rule dadi_infer_dfe:
         output_dir + "/inference/{demog}/dadi/{dfes}/{annots}/{seeds}/{chrms}/pop{ids}/pop{ids}.two_epoch.InferDM.bestfits"
     output:
         output_dir + "/inference/{demog}/dadi/{dfes}/{annots}/{seeds}/{chrms}/pop{ids}/pop{ids}.two_epoch.gamma.InferDFE.bestfits",
-        output_dir + "/inference/{demog}/dadi/{dfes}/{annots}/{seeds}/{chrms}/pop{ids}/pop{ids}.two_epoch.gamma.log"
     params:
         dfe = 'gamma',
         dfe_p0 = '0.5 1000',
@@ -163,9 +161,8 @@ rule dadi_infer_dfe:
     threads: 8
     shell:
         """
-        dadi-cli InferDFE --fs {input[0]} --cache1d {input[1]} --demo-popt {input[2]} --output-prefix {params.prefix} --pdf1d {params.dfe} --p0 {params.dfe_p0} --ubounds {params.dfe_ubounds} --lbounds {params.dfe_lbounds} --ratio {params.ratio} --optimizations {params.opts} --cpus {threads} --nomisid &>> {params.prefix}.log
+        dadi-cli InferDFE --fs {input[0]} --cache1d {input[1]} --demo-popt {input[2]} --output-prefix {params.prefix} --pdf1d {params.dfe} --p0 {params.dfe_p0} --ubounds {params.dfe_ubounds} --lbounds {params.dfe_lbounds} --ratio {params.ratio} --optimizations {params.opts} --cpus {threads} --nomisid --force-convergence
 
-        dadi-cli BestFit --input-prefix {params.prefix}.InferDFE --ubounds {params.dfe_ubounds} --lbounds {params.dfe_lbounds} &>> {params.prefix}.log
         """
 
 rule get_dadi_dfe_bestfits:
