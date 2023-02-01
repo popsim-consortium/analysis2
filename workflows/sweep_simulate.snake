@@ -7,21 +7,27 @@ import pandas as pd
 import tskit
 import stdpopsim
 import math
+import subprocess
+import wget
 from scipy.optimize import root_scalar
 
 configfile: "workflows/config/snakemake/sweep_config.yaml"
 
-
 rng = np.random.default_rng(seed=config["seed"])
 rng2 = np.random.default_rng(seed=config["seed"]+1)
+
 # ###############################################################################
-# GENERAL RULES & GLOBALS
+# GLOBALS
 # ###############################################################################
+
+# ----------------- Setup parameter grid ----------------- 
 
 # The number of replicates of each analysis you would like to run
 replicates = config["replicates"]
+
 # Where you would like all output files from analysis to live
 output_dir = os.path.abspath(config["output_dir"])
+sf2_dir = output_dir + "/SF2"
 
 # The analysis species
 species = stdpopsim.get_species(config["species"])
@@ -48,30 +54,29 @@ windows = np.column_stack((win_start,win_end))
 #windows = windows[~np.any(windows>max_coord, axis=1),:]
 windows = np.floor(windows)
 
-# Grid of selection coeffs and sweep start times
+# Grid of selection coeffs
 coeffs_dict = config["coeffs"]
-
-
 sel_coeffs = np.linspace(*coeffs_dict["bounds"], coeffs_dict["grid_size"])
 
-
+# Random seeds for main simulations, checks on boundary size
 seed_array = rng.integers(1,2**31,replicates)
 seed2_array = rng2.integers(1,2**31,config["boundary_reps"])
 
 # The specific demographic model you would like to run
 demo_model = config["demo_model"]
-#import pdb; pdb.set_trace()
 pop_list = []
 for popname, n in demo_model["samples"].items():
     if n > 0:
         pop_list.append(popname)
-#pop_list = [popname if n > 0 for popname, n in demo_model["samples"].items()] 
+
 # Simulate across multiple DFEs/annotations
 dfe_list = config["dfe_list"]
 annotation_list = config["annotation_list"]
 
 # Region size 
 region_size = config["region_size"]
+
+# -------------- Helper functions for making buffer around focal window ---------------
 
 def genetic_distance(ratemap, x, x0=0):
     """
@@ -111,7 +116,13 @@ def make_buffer(gmap, cM, left, right):
         right = gmap.sequence_length
     return left, right
 
+
 def add_window_metadata(ts, window_left, window_right, window_bleft, window_bright, extra=None):
+    """
+    Add information on window and buffer to the tree sequence metadata. 
+    "bleft" and "bright" are for buffer, "left" and "right" are for focal window.
+    Positions are measured relative to "bleft".
+    """
     if extra is None:
         extra = ""
     tables = ts.dump_tables()
@@ -130,24 +141,171 @@ def add_window_metadata(ts, window_left, window_right, window_bleft, window_brig
     tables.metadata = metadata
     return tables.tree_sequence()
 
+
+# ----------- Helper functions for sweepfinder -----------
+
+def run_sweepfinder(sf2_path, ts_path, recmap, model, samples):
+    """
+    Dump allele frequencies, recombination rates into sweepfinder input formats;
+    calculate expected site frequency spectrum under neutrality; run sweepfinder
+    across a grid of test sites in the focal window
+    """
+    spec_path = ts_path + ".sf2.spec"
+    grid_path = ts_path + ".sf2.grid"
+    freq_path = ts_path + ".sf2.freq"
+    rate_path = ts_path + ".sf2.rate"
+    clr_path = ts_path + ".sf2.clr"
+    ts = tskit.load(ts_path)
+    dump_sf2_spectrum_file(spec_path, model, samples)
+    dump_sf2_allele_frequency_file(freq_path, ts)
+    dump_sf2_recombination_rate_file(rate_path, recmap, ts)
+    dump_sf2_grid_file(grid_path, ts)
+    args = [f"{sf2_path}/SweepFinder2", "-lru", f"{grid_path}", f"{freq_path}", f"{rate_path}", f"{clr_path}"]
+    subprocess.run(args)
+
+
+def dump_sf2_spectrum_file(output_path, model, samples, replicates=10000, seed=1024):
+    """
+    Simulate neutral spectrum for sweepfinder, given a stdpopsim demographic model
+    and a population-sample dict. Uses marginal trees to cut computation time,
+    fix seed so as to use the same spectrum. Dump into sweepfinder2's input format,
+    which is two columns per SFS bin (including monomorphic bins), that are
+    frequency and proportion of sites. The proportions should be 0 for the monomorphic
+    bins.
+
+    This is quick enough that there's no need to cache
+    """
+    sim_gen = msprime.sim_ancestry(
+        samples=samples,
+        demography=model.model,
+        num_replicates=replicates,
+        sequence_length=1,
+        recombination_rate=0.0,
+        random_seed=seed,
+    )
+    out = None
+    for ts in sim_gen:
+        sfs = ts.allele_frequency_spectrum(mode='branch', polarised=True)
+        sfs /= np.sum(sfs)
+        if out is None:
+            out = sfs
+        else:
+            out += sfs
+    out /= np.sum(out)
+    handle = open(output_path, "w")
+    for i, prop in enumerate(out):
+        handle.write(f"{i}\t{prop}\n")
+    handle.close()
+
+
+def dump_sf2_allele_frequency_file(output_path, ts):
+    """
+    Dump allele frequencies from tree sequence into sweepfinder2's input
+    format, which is four columns per SNP; that are position, allele frequency,
+    number of haploids, and not folded/folded (0/1). Positions are 1-based.
+    """
+    handle = open(output_path, "w")
+    offset = ts.metadata['windowing']['window_bleft']
+    focal_left = ts.metadata['windowing']['window_left'] - offset
+    focal_right = ts.metadata['windowing']['window_right'] - offset
+    handle.write("position\tx\tn\tfolded\n")
+    for var in ts.variants():
+        if var.position >= focal_right:
+            break
+        elif var.position >= focal_left:
+            pos = int(var.position)
+            geno = var.genotypes()
+            x = np.sum(geno == 1)
+            n = np.sum(geno != tskit.MISSING_DATA)
+            handle.write(f"{pos+1}\t{x}\t{n}\t{0}\n")
+    handle.close()
+
+
+def dump_sf2_recombination_rate_file(output_path, recmap, ts):
+    """
+    Dump recombination rates into sweepfinder2's input format, which is two
+    columns per SNP, that are position and recombination rate in cM from the
+    last SNP (e.g. cumulative recombination rate). Positions are 1-based.
+    """
+    offset = ts.metadata['windowing']['window_bleft']
+    focal_left = ts.metadata['windowing']['window_left'] - offset
+    focal_right = ts.metadata['windowing']['window_right'] - offset
+    recmap_slice = recmap.slice(
+      left=offset, trim=True
+    )
+    handle = open(output_path, "w")
+    handle.write("position\trate\n")
+    last_pos = None
+    for var in ts.variants():
+        if var.position >= focal_right:
+            break
+        elif var.position >= focal_left:
+            pos = int(var.position)
+            if last_pos is None:
+                dist = 0
+            else:
+                dist = genetic_distance(
+                  recmap_slice, pos, last_pos
+                )
+            last_pos = pos
+            handle.write(f"{pos+1}\t{dist}\n")
+    handle.close()
+
+
+def dump_sf2_grid_file(output_path, ts, grid_size=100):
+    """
+    Dump test grid into sweepfinder2's input format, which is one position on
+    each line. Positions are 1-based.
+
+    For debugging/visualisation use a fine grid. Probably only really need the
+    centermost point, as there's no variants from outside the focal window.
+    """
+    offset = ts.metadata['windowing']['window_bleft']
+    focal_left = ts.metadata['windowing']['window_left'] - offset
+    focal_right = ts.metadata['windowing']['window_right'] - offset
+    grid = np.linspace(focal_left, focal_right, grid_size)
+    handle = open(output_path, "w")
+    for pos in grid:
+        handle.write(f"{int(pos)}\n")
+    handle.close()
+
+
+# ----------- Helper functions for summary statistics -----------
+
 def compute_stats(ts, sample_sets):
+    """
+    Calculate simple summary statistics for a window
+
+    TODO: offload to scikit-allel
+    """
     offset = ts.metadata['windowing']['window_bleft']
     windows_bpoints = np.array([ts.metadata['windowing']['window_bleft']-offset,
                                 ts.metadata['windowing']['window_left']-offset,
                                 ts.metadata['windowing']['window_right']-offset,
                                 ts.metadata['windowing']['window_bright']-offset], dtype=np.int32)
-    # removing duplicates if bleft and left are the same or brighta and right
+    # removing duplicates if bleft/left or bright/right are the same
     windows_bpoints = np.unique(windows_bpoints)
     # something wonky happening with float conversion
     if windows_bpoints[-1] == ts.sequence_length - 1:
         windows_bpoints[-1] = ts.sequence_length
     assert (windows_bpoints.shape == (2,)) or windows_bpoints.shape == (4,)
-    taj=ts.Tajimas_D(sample_sets=sample_sets, windows=windows_bpoints,mode="site")
+    taj=ts.Tajimas_D(sample_sets=sample_sets, windows=windows_bpoints, mode="site")
     focal_taj = taj[len(taj)//2, :] 
     return focal_taj, taj
 
+
+# ---------- Helper functions to aggregate output ----------
+
+def simulation_outputs(...):
+    """
+    Get summary stats, etc from a tree sequence and dump into one table per window
+    """
+    stats, stat_names = compute_stats(...)
+    clr, clr_names = compute_clr(...)
+
+
 # ###############################################################################
-# GENERAL RULES & GLOBALS
+# GENERAL RULES
 # ###############################################################################
 
 boundary_outs = [output_dir +f"/simulated_data/sweeps/boundary_sims/sim_{seed}_{config['region_size']}.trees"
@@ -186,6 +344,15 @@ stats_outs = [file_prefix+".stats.tsv" for file_prefix in neutral_outs_prefix + 
 rule all:
     input:
         boundary_outs + trees_outs + stats_outs + [output_dir + f'/simulated_data/sweeps/all_sims.stats.tsv']
+
+rule install_sf2:
+    input:
+    output:
+        sf2_dir + "/SweepFinder2"
+    run:
+        wget.download(config["sf2_url"], out=>>>)
+        subprocess.run(["tar", "xzvf", f"{output_dir}/SF2.tar.gz"])
+        subprocess.run([".."])
 
 rule boundary_sims:
     input:
