@@ -11,7 +11,8 @@ import subprocess
 import wget
 from scipy.optimize import root_scalar
 
-configfile: "workflows/config/snakemake/sweep_config.yaml"
+#configfile: "workflows/config/snakemake/sweep_config.yaml"
+configfile: "workflows/config/snakemake/small_sweep.yaml"
 
 rng = np.random.default_rng(seed=config["seed"])
 rng2 = np.random.default_rng(seed=config["seed"]+1)
@@ -27,7 +28,6 @@ replicates = config["replicates"]
 
 # Where you would like all output files from analysis to live
 output_dir = os.path.abspath(config["output_dir"])
-sf2_dir = output_dir + "/SF2"
 
 # The analysis species
 species = stdpopsim.get_species(config["species"])
@@ -144,7 +144,7 @@ def add_window_metadata(ts, window_left, window_right, window_bleft, window_brig
 
 # ----------- Helper functions for sweepfinder -----------
 
-def run_sweepfinder(sf2_path, ts_path, recmap, model, samples):
+def compute_clr(ts_path, recmap, model, samples):
     """
     Dump allele frequencies, recombination rates into sweepfinder input formats;
     calculate expected site frequency spectrum under neutrality; run sweepfinder
@@ -160,7 +160,7 @@ def run_sweepfinder(sf2_path, ts_path, recmap, model, samples):
     dump_sf2_allele_frequency_file(freq_path, ts)
     dump_sf2_recombination_rate_file(rate_path, recmap, ts)
     dump_sf2_grid_file(grid_path, ts)
-    args = [f"{sf2_path}/SweepFinder2", "-lru", f"{grid_path}", f"{freq_path}", f"{rate_path}", f"{clr_path}"]
+    args = ["SweepFinder2", "-lru", f"{grid_path}", f"{freq_path}", f"{rate_path}", f"{clr_path}"]
     subprocess.run(args)
 
 
@@ -274,7 +274,7 @@ def dump_sf2_grid_file(output_path, ts, grid_size=100):
 
 def compute_stats(ts, sample_sets):
     """
-    Calculate simple summary statistics for a window
+    Calculate summary statistics for a window
 
     TODO: offload to scikit-allel
     """
@@ -292,16 +292,6 @@ def compute_stats(ts, sample_sets):
     taj=ts.Tajimas_D(sample_sets=sample_sets, windows=windows_bpoints, mode="site")
     focal_taj = taj[len(taj)//2, :] 
     return focal_taj, taj
-
-
-# ---------- Helper functions to aggregate output ----------
-
-def simulation_outputs(...):
-    """
-    Get summary stats, etc from a tree sequence and dump into one table per window
-    """
-    stats, stat_names = compute_stats(...)
-    clr, clr_names = compute_clr(...)
 
 
 # ###############################################################################
@@ -344,15 +334,6 @@ stats_outs = [file_prefix+".stats.tsv" for file_prefix in neutral_outs_prefix + 
 rule all:
     input:
         boundary_outs + trees_outs + stats_outs + [output_dir + f'/simulated_data/sweeps/all_sims.stats.tsv']
-
-rule install_sf2:
-    input:
-    output:
-        sf2_dir + "/SweepFinder2"
-    run:
-        wget.download(config["sf2_url"], out=>>>)
-        subprocess.run(["tar", "xzvf", f"{output_dir}/SF2.tar.gz"])
-        subprocess.run([".."])
 
 rule boundary_sims:
     input:
@@ -560,6 +541,9 @@ rule get_stats:
             params_dict["annot"] = params_list[3]
             params_dict["dfe"] = params_list[4]
             params_dict["coeff"] = params_list[5]
+        dmodel = species.get_demographic_model(demo_model["id"])
+        dsamples = demo_model["samples"]
+        compute_clr(input[0], recmap, dmodel, dsamples)
         _get_stats(input, output, params_dict, target_pops)
 
 rule merge_stats:

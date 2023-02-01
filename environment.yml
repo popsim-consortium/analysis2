@@ -27,6 +27,7 @@ dependencies:
   - dadi==2.2.0
   - mamba
   - openjdk
+  - sweepfinder2
   - pip:
     - git+https://github.com/popsim-consortium/stdpopsim.git
     - scikit-allel
