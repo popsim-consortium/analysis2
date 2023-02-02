@@ -15,6 +15,7 @@ gsl
 scikit-learn
 dadi
 slim=4.0
+sweepfinder2
 r-essentials
 r-base
 r-irkernel
