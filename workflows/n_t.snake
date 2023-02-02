@@ -132,14 +132,14 @@ try:
 except KeyError:
     mask_file = None
 
-localrules:  
-    download_genetic_map,
-    download_msmc,
-    sp_download,
-    clone_smcpp,
-    gone_clone,
-    gone_copy,
-    gone_params,
+#localrules:
+#    download_genetic_map,
+#    download_msmc,
+#    sp_download,
+#    clone_smcpp,
+#    gone_clone,
+#    gone_copy,
+#    gone_params,
 
 
 rule all:
@@ -365,6 +365,8 @@ rule run_msmc:
         expand(output_dir + "/inference/{{demog}}/msmc/{{dfes}}/{{annots}}/{{seeds}}/{{pops}}/{samps}.trees.multihep.txt.final.txt",
             samps=num_sampled_genomes_msmc)
     threads: 8
+    resources:
+        mem_mb=24000
     run:
         inputs = expand(output_dir + "/inference/{demog}/msmc/{dfes}/{annots}/{seeds}/{pops}/{chrms}.trees.multihep.txt",
                     demog=wildcards.demog,

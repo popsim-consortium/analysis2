@@ -44,6 +44,14 @@ module n_t_workflow:
 
 use rule * from n_t_workflow as n_t_*
 
+localrules:
+    n_t_download_genetic_map,
+    n_t_download_msmc,
+    n_t_sp_download,
+    n_t_clone_smcpp,
+    n_t_gone_clone,
+    n_t_gone_copy,
+    n_t_gone_params,
 
 output_dir = os.path.abspath(config["output_dir"])
 
