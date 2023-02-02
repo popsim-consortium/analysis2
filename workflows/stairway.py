@@ -46,7 +46,7 @@ class StairwayPlotRunner(object):
             stairway_path, stairway_path / "swarmops.jar")
         self.java_exe = java_exe
 
-    def ts_to_stairway(self, ts_path, num_bootstraps=1, mask_intervals=None):
+    def ts_to_stairway(self, ts_path, pop_name, mask_intervals, num_bootstraps=1):
         """
         Converts the specified tskit tree sequence to text files used by
         stairway plot.
@@ -54,13 +54,18 @@ class StairwayPlotRunner(object):
         derived_counts_all = [[] for _ in range(num_bootstraps + 1)]
         total_length = 0
         num_samples = 0
+        if type(mask_intervals) is not list:
+            mask_intervals = [mask_intervals]
         for i, ts_p in enumerate(ts_path):
             ts = tskit.load(ts_p)
+            pop_id = [p.id for p in ts.populations() if p.metadata.get("name") == pop_name]
+            pop_nodes = ts.samples(population=pop_id)
+            ts = ts.simplify(samples=pop_nodes)
             total_length += ts.sequence_length
-            # masking?
-            if mask_intervals is not None:
-                ts = ts.delete_intervals(mask_intervals)
-                total_length -= np.sum(mask_intervals[:, 1] - mask_intervals[:, 0])
+            if mask_intervals[i] is not None:
+                ts = ts.delete_intervals(mask_intervals[i])
+                total_length -= np.sum(mask_intervals[i][:, 1] - mask_intervals[i][:, 0])
+
             num_samples = ts.num_samples
             haps = ts.genotype_matrix()
 
@@ -102,12 +107,12 @@ class StairwayPlotRunner(object):
             # plot unmasked neutral / non-neutral SFS
             sfs = allel.sfs(allel.HaplotypeArray(
                 haps_neu).count_alleles()[:, 1])[1:]
-            sfs_path = ts_p+".sfs.neutral.pdf"
+            sfs_path = f"{ts_p}.{pop_name}.sfs.neutral.pdf"
             plots.plot_sfs([sfs], sfs_path)
             if len(non_neu_positions) > 0:
                 sfs = allel.sfs(allel.HaplotypeArray(
                     haps_non_neu).count_alleles()[:, 1])[1:]
-                sfs_path = ts_p+".sfs.non_neutral.pdf"
+                sfs_path = f"{ts_p}.{pop_name}.sfs.non_neutral.pdf"
                 plots.plot_sfs([sfs], sfs_path)
 
             # Bootstrap allele counts (neutral)
