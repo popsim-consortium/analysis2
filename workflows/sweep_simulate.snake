@@ -208,7 +208,7 @@ def dump_sf2_spectrum_file(output_path, model, samples, sample_set, replicates=1
             out += sfs
     out /= np.sum(out)
     handle = open(output_path, "w")
-    for i, prop in enumerate(out):
+    for i, prop in enumerate(out[:-1]):
         handle.write(f"{i}\t{'%.6e' % prop}\n")
     handle.close()
 
