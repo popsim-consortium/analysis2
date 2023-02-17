@@ -1,0 +1,286 @@
+"""
+Snakefile for calculating summary stats 
+"""
+
+import os
+import numpy as np
+import stdpopsim
+import tskit
+import textwrap
+import itertools
+import glob
+
+configfile: "workflows/config/snakemake/tiny_config.yaml"
+
+np.random.seed(config["seed"])
+
+# ###############################################################################
+# GENERAL RULES & GLOBALS
+# ###############################################################################
+
+# The number of replicates of each analysis you would like to run
+replicates = config["replicates"]
+# Where you would like all output files from analysis to live
+output_dir = os.path.abspath(config["output_dir"])
+
+# The analysis species
+species = stdpopsim.get_species(config["species"])
+
+
+# The names of all chromosomes to simulate, separated by commas
+# Use "all" to simulate all chromsomes for the genome
+chrm_list = [chrom.id for chrom in species.genome.chromosomes]
+if "chrY" in chrm_list:
+    chrm_list.remove("chrY")
+if(config["chrm_list"] != "all"):
+    chrm_list = [chr for chr in config["chrm_list"].split(",")]
+
+seed_array = np.random.random_integers(1,2**31,replicates)
+
+demo_model_array = config["demo_models"]
+demo_model_ids = [x["id"] for x in demo_model_array]
+demo_sample_size_dict = {}
+demo_pop_ids = {}
+for x in demo_model_array:
+    if x["id"] == "Constant":
+        model = stdpopsim.PiecewiseConstantSize(species.population_size)
+    else:
+        model = species.get_demographic_model(x["id"])
+    demo_sample_size_dict[x["id"]] = {f"{model.populations[i].name}": m for i, m in enumerate(x["num_samples_per_population"])}
+    demo_pop_ids[x["id"]] = [x.name for x in model.populations]
+
+# Select DFE model from catalog  
+dfe_list = config["dfe_list"]
+annotation_list = config["annotation_list"]
+mask_file = config["mask_file"]
+
+
+
+nchunks=100
+chunks = np.arange(nchunks)
+# ###############################################################################
+# GENERAL RULES & GLOBALS
+# ###############################################################################
+
+
+rule all:
+    input:
+        expand(
+            [output_dir + "/summaries/{{demog}}/{dfes}/{annots}/{{seeds}}/sim_{{chrms}}.{{exts}}".format(
+                dfes=DFE, annots=ANNOT) for (DFE, ANNOT) in zip(dfe_list, annotation_list)],
+            demog=demo_model_ids,
+            seeds=seed_array,
+            chrms=chrm_list,
+            exts=["sampleToPopFile", 
+                "ancestralAllelesFile", 
+                "vcf",
+                ],
+        ),
+       # expand(
+       #     [output_dir + "/summaries/{demog}/{dfes}/{annots}/{{seeds}}/sim_{{chrms}}.{popid}.{{chunk}}.{{exts}}".format(
+       #         dfes=DFE, annots=ANNOT, popid=POPID, demog=DEMOG)
+       #             for (POPID, DEMOG, DFE, ANNOT) in [item 
+       #                 for xx in [[(i, z[0],z[1][0],z[1][1]) 
+       #                 for i in demo_pop_ids[z[0]]] 
+       #                 for z in [ x 
+       #                     for x in itertools.product(demo_model_ids, zip(dfe_list, annotation_list))]] 
+       #                     for item in xx]],
+       #     seeds=seed_array,
+       #     chrms=chrm_list,
+       #     chunk=chunks,
+       #     exts=["diploshic.fvec", "diploshic.stats"],
+       # ),
+        expand(
+            [output_dir + "/summaries/{demog}/{dfes}/{annots}/{{seeds}}/sim_{{chrms}}.{popid}.{{exts}}".format(
+                dfes=DFE, annots=ANNOT, popid=POPID, demog=DEMOG) for (POPID, DEMOG, DFE, ANNOT) in [item for xx in [[(i, z[0],z[1][0],z[1][1]) for i in demo_pop_ids[z[0]]] for z in [ x for x in itertools.product(demo_model_ids, zip(dfe_list, annotation_list))]] for item in xx]],
+            seeds=seed_array,
+            chrms=chrm_list,
+            chunk=chunks,
+            exts=["pi.png",
+                 "diploshic.stats",
+                 ],
+        ),
+        expand(
+            [output_dir + "/summaries/{demog}/{dfes}/{annots}/sim_{{chrms}}.allseeds.{popid}.pi.png".format(
+                dfes=DFE, annots=ANNOT, popid=POPID, demog=DEMOG) for (POPID, DEMOG, DFE, ANNOT) in [item for xx in [[(i, z[0],z[1][0],z[1][1]) for i in demo_pop_ids[z[0]]] for z in [ x for x in itertools.product(demo_model_ids, zip(dfe_list, annotation_list))]] for item in xx]],
+            chrms=chrm_list,
+        ),
+
+
+
+ 
+
+rule make_vcf:
+    input:
+        output_dir + "/simulated_data/{demog}/{dfes}/{annots}/{seeds}/sim_{chrms}.trees"
+
+    output:
+        output_dir + "/summaries/{demog}/{dfes}/{annots}/{seeds}/sim_{chrms}.vcf"
+    run:
+        ts = tskit.load(input[0])
+        ts.write_vcf(open(output[0], "w"))
+
+def write_diploshic_sampleToPopFile(ts, filename, key):
+    samp_dict = demo_sample_size_dict[key]
+    with open(filename, "w") as f:
+        count = 0
+        for pop in samp_dict:
+            for i in range(samp_dict[pop]):
+                f.write(f"tsk_{count}\t{pop}\n")
+                count += 1
+    f.close()
+
+rule make_diploshic_inputs:
+    input:
+        output_dir + "/simulated_data/{demog}/{dfes}/{annots}/{seeds}/sim_{chrms}.trees"
+
+    output:
+        output_dir + "/summaries/{demog}/{dfes}/{annots}/{seeds}/sim_{chrms}.sampleToPopFile",
+        output_dir + "/summaries/{demog}/{dfes}/{annots}/{seeds}/sim_{chrms}.ancestralAllelesFile"
+
+    run:
+        ts = tskit.load(input[0])
+        write_diploshic_sampleToPopFile(ts, output[0], wildcards.demog)
+        with open(output[1], "w") as f:
+            f.write(">ancestral\n")
+            seq = "".join(["0" for x in range(int(ts.sequence_length))])
+            f.write(seq)
+        f.close()
+
+def chunk_coords(chr, chunk, nchunks):
+    seq_length = species.get_contig(chr).length
+    chunk_size = int(seq_length / nchunks)
+    chunk_size = max(chunk_size, 1.1e7)
+    start = chunk * chunk_size
+    end = (chunk + 1) * chunk_size
+    if end > seq_length:
+        test = 0
+    elif start > seq_length - chunk_size:
+        test = 0
+    else:
+        test = 1
+    return [int(start), int(end), test]
+
+
+rule run_diploshic_fvs:
+    input:
+        rules.make_vcf.output,
+        rules.make_diploshic_inputs.output
+
+    output:
+        expand(output_dir + "/summaries/{{demog}}/{{dfes}}/{{annots}}/{{seeds}}/sim_{{chrms}}.{{popid}}.{{chunk}}.diploshic.{ext}",
+            chunk=chunks,
+            ext=["fvec", "stats"],        
+            )
+
+
+    params:
+        seq_len = lambda wildcards, input: int(species.get_contig(wildcards.chrms).length), 
+        start = lambda wildcards, input: chunk_coords(wildcards.chrms, int(wildcards.chunk), nchunks)[0],
+        end = lambda wildcards, input: chunk_coords(wildcards.chrms, int(wildcards.chunk), nchunks)[1],
+        test = lambda wildcards, input: chunk_coords(wildcards.chrms, int(wildcards.chunk), nchunks)[2],
+        popid = lambda wildcards, input: wildcards.popid,
+
+    shell:
+        """
+        if [ {params.test} -eq 1 ]; 
+            then
+                diploSHIC fvecVcf diploid {input[0]} 1 {params.seq_len} {output[0]} --sampleToPopFileName {input[1]} --ancFileName {input[2]} --targetPop {params.popid} --statFileName {output[1]} --segmentStart {params.start} --segmentEnd {params.end} 
+            else
+                touch {output[0]} && touch {output[1]}
+        fi
+        """
+
+
+rule gather_diploshic_fvs:
+    input:
+         expand(output_dir + "/summaries/{{demog}}/{{dfes}}/{{annots}}/{{seeds}}/sim_{{chrms}}.{{popid}}.{chunk}.diploshic.{ext}",
+            chunk=chunks,
+            ext=["fvec", "stats"],        
+            )  
+    output:
+        output_dir + "/summaries/{demog}/{dfes}/{annots}/{seeds}/sim_{chrms}.{popid}.diploshic.stats",
+    shell:
+        """
+        cat results/summaries/{wildcards.demog}/{wildcards.dfes}/{wildcards.annots}/{wildcards.seeds}/sim_{wildcards.chrms}.{wildcards.popid}.*.diploshic.stats | sort -nk 2 | uniq >> {output}
+        """
+
+rule plot_pi_individual:
+    input:
+        output_dir + "/summaries/{demog}/{dfes}/{annots}/{seeds}/sim_{chrms}.{popid}.diploshic.stats",
+    output:
+        output_dir + "/summaries/{demog}/{dfes}/{annots}/{seeds}/sim_{chrms}.{popid}.pi.png",
+    run:
+        import pandas as pd
+        import matplotlib.pyplot as plt
+        import seaborn as sns
+        import numpy as np
+        import os
+        import sys
+        import math
+        import matplotlib
+
+        sns.set_theme()
+        matplotlib.use('Agg')
+        df = pd.read_csv(input[0], sep="\t")
+#        df["pi"] = df["pi"].apply(lambda x: math.log(x))
+        df["mid"] = df["start"] + (df["end"] - df["start"]) / 2
+        fig, ax = plt.subplots(figsize=(10, 10))
+        sns.lineplot(x="mid", y="pi", data=df, ax=ax, linewidth=2.5, palette="tab10")
+        
+        # plot annotations as rugplot
+        if wildcards.annots != "none":
+            exons = species.get_annotations(wildcards.annots)
+            exon_intervals = exons.get_chromosome_annotations(wildcards.chrms)
+            sns.rugplot(pd.DataFrame(data={'exons':exon_intervals[:,0]}), ax=ax, color="g", lw=1, alpha=0.05)
+        ax.set_title("pi")
+        ax.set_xlabel("position")
+        fig.savefig(output[0])
+        plt.close(fig)
+
+rule plot_pi_allseeds:
+    input:
+        expand(output_dir + "/summaries/{{demog}}/{{dfes}}/{{annots}}/{seeds}/sim_{{chrms}}.{{popid}}.diploshic.stats",
+            seeds=seed_array,
+            )
+    output:
+        output_dir + "/summaries/{demog}/{dfes}/{annots}/sim_{chrms}.allseeds.{popid}.pi.png",
+        output_dir + "/summaries/{demog}/{dfes}/{annots}/sim_{chrms}.allseeds.{popid}.diploshic.stats",
+    run:
+        import pandas as pd
+        import matplotlib.pyplot as plt
+        import seaborn as sns
+        import numpy as np
+        import os
+        import sys
+        import math
+        import matplotlib
+
+        sns.set_theme()
+        matplotlib.use('Agg')
+
+        dfs = [pd.read_csv(x, sep="\t") for x in input]
+        count = 0
+        for df in dfs:
+            df["mid"] = df["start"] + (df["end"] - df["start"]) / 2
+            df["seed"] = count
+            count += 1
+        stacked = pd.concat(dfs)
+        stacked.to_csv(output[1], sep="\t", index=False)
+
+        fig, axs = plt.subplots(ncols=1, nrows=3, figsize=(15, 20), sharex=True)
+        stat_names = ["pi", "tajD", "diplo_ZnS"]
+        for i, stat in enumerate(stat_names):
+            sns.lineplot(data=stacked, x="mid", y=stat, hue="seed", alpha=0.5, ax=axs[i])
+            # plot annotations as rugplot
+            if wildcards.annots != "none":
+                exons = species.get_annotations(wildcards.annots)
+                exon_intervals = exons.get_chromosome_annotations(wildcards.chrms)
+                sns.rugplot(pd.DataFrame(data={'exons':exon_intervals[:,0]}),
+                             color="g", 
+                             lw=1, 
+                             alpha=0.05,
+                             ax=axs[i])
+        
+        fig.savefig(output[0])
+        
