@@ -362,8 +362,9 @@ rule run_msmc:
                 chrms=chrm_list),
         rules.download_msmc.output,
     output:
-        expand(output_dir + "/inference/{{demog}}/msmc/{{dfes}}/{{annots}}/{{seeds}}/{{pops}}/{samps}.trees.multihep.txt.final.txt",
-            samps=num_sampled_genomes_msmc)
+        #expand(output_dir + "/inference/{{demog}}/msmc/{{dfes}}/{{annots}}/{{seeds}}/{{pops}}/{samps}.trees.multihep.txt.final.txt",
+        #            samps=num_sampled_genomes_msmc),
+        output_dir + "/inference/{demog}/msmc/{dfes}/{annots}/{seeds}/{pops}/{samps}.trees.multihep.txt.final.txt"
     threads: 8
     resources:
         mem_mb=24000
@@ -378,15 +379,17 @@ rule run_msmc:
                         )
         total_samples = demo_sample_size_dict[wildcards.demog][wildcards.pops]
         input_file_string = " ".join(inputs)
-        # TODO: get wildcards.samps to work so that num_sampled_genomes_msmc are run in parallel
         output_file_string = output_dir + f"/inference/{wildcards.demog}/msmc/{wildcards.dfes}/{wildcards.annots}/{wildcards.seeds}/{wildcards.pops}/"
-        msmc.run_msmc_estimate(input_file_string, output_file_string, msmc_exec, total_samples, num_sampled_genomes_msmc,
+        msmc.run_msmc_estimate(input_file_string, output_file_string, wildcards.samps, msmc_exec, total_samples,
             iterations=num_msmc_iterations, ncores=threads)
 
 
 rule convert_msmc:
     input:
-        rules.run_msmc.output
+        #rules.run_msmc.output,
+        #output_dir + "/inference/{demog}/msmc/{dfes}/{annots}/{seeds}/{pops}/{samps}.trees.multihep.txt.final.txt"
+        expand(output_dir + "/inference/{{demog}}/msmc/{{dfes}}/{{annots}}/{{seeds}}/{{pops}}/{samps}.trees.multihep.txt.final.txt",
+                    samps=num_sampled_genomes_msmc),
     output:
         output_dir + "/inference/{demog}/msmc/{dfes}/{annots}/{seeds}/{pops}/msmc_estimated_Ne.txt"
     run:

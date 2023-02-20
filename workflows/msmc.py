@@ -71,7 +71,7 @@ def write_msmc_file(path, output, pop_name, mask_intervals=None):
     return None
 
 
-def run_msmc_estimate(input_files, output_file, msmc_exec_loc, total_samples, num_genomes, iterations=1, ncores=1):
+def run_msmc_estimate(input_files, output_file, num_genomes, msmc_exec_loc, total_samples, iterations=1, ncores=1):
     """
     This is to run the msmc command and get estimates,
     It then will convert the scales times and pop sizes
@@ -80,17 +80,12 @@ def run_msmc_estimate(input_files, output_file, msmc_exec_loc, total_samples, nu
     The final estimates will be written to
     input_file.final.txt
     """
-    # TODO: change here, to num_samples and drop loop, if get wildcards.samps sorted in n_t.smk
-    assert max(num_genomes) < total_samples * 2
-    for nsamps in num_genomes:
-        subset = np.random.choice(range(total_samples*2), nsamps, replace=False)
-        haplotypes = ",".join(map(str, sorted(subset)))
-        cmd = (f"{msmc_exec_loc} -r 0.25 -I {haplotypes} -i {iterations} -o {output_file}{nsamps}.trees.multihep.txt -t {ncores} {input_files}")
-        try:
-            subprocess.run(cmd, shell=True, check=True)
-        except subprocess.CalledProcessError as e:
-            print(e.output)
-            subprocess.run(cmd, shell=True, check=True)
+    num_genomes = int(num_genomes)
+    assert num_genomes < total_samples * 2
+    subset = np.random.choice(range(total_samples*2), num_genomes, replace=False)
+    haplotypes = ",".join(map(str, sorted(subset)))
+    cmd = (f"{msmc_exec_loc} -r 0.25 -I {haplotypes} -i {iterations} -o {output_file}{num_genomes}.trees.multihep.txt -t {ncores} {input_files}")
+    subprocess.run(cmd, shell=True, check=True)
 
 
 def convert_msmc_output(results_file, outfile, mutation_rate, generation_time):
