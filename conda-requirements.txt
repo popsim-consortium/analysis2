@@ -14,4 +14,10 @@ blas
 gsl
 scikit-learn
 dadi
-slim=3.7.1
+slim=4.0
+sweepfinder2
+r-essentials
+r-base
+r-irkernel
+r-ggplot2
+r-dplyr

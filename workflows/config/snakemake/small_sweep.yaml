@@ -1,0 +1,42 @@
+# General configs
+seed: 12345
+replicates: 2
+output_dir: results
+
+# Contig configs
+species: HomSap
+chrom: chr1
+genetic_map: HapMapII_GRCh38
+
+# Demographic configs
+demo_model:
+  id: OutOfAfrica_3G09
+  samples: 
+    YRI: 10
+    CEU: 10
+    CHB: 0
+
+# BGS configs
+dfe_list: 
+  - Gamma_H17
+annotation_list: 
+  - ensembl_havana_104_exons
+
+# Simulate overlapping windows along chromosome
+# Coordinates are scaled to the unit line
+num_windows: 2 # number of sweep locations in chromosome
+focal_size: 5_000_000 # size of the focal sweep window in bp
+buffer_cM: 2.5
+# Sweep configs
+coeffs: 
+  bounds: [0.03, 0.1]
+  grid_size: 1 # This will yield just one s=0.03 or 2Ns~600
+sweep_min_freq: 0.8
+
+# slim settings
+slim_scaling_factor: 2
+slim_burn_in: 2 # in N gens
+
+# Boundary sims
+boundary_reps: 1
+region_size: 10_000_000

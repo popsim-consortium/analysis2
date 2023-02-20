@@ -10,7 +10,7 @@ import ts2fs
 import plots
 import masks
 
-configfile: "workflows/config/snakemake/config.yaml"
+configfile: "workflows/config/snakemake/tiny_config.yaml"
 
 
 np.random.seed(config["seed"])
@@ -63,8 +63,15 @@ for x in demo_model_array:
     demo_sample_size_dict[x["id"]] = x["num_samples_per_population"]
 
 # Select DFE model from catalog  
-dfe_list = config["dfe_list"]   
-annotation_list = config["annotation_list"]
+#dfe_list = config["dfe_list"]   
+#annotation_list = config["annotation_list"]
+dfe_dict = dict.fromkeys(config["dfe_list"])
+del dfe_dict["none"]
+dfe_list = list(dfe_dict)
+annotation_dict = dict.fromkeys(config["annotation_list"])
+del annotation_dict["none"]
+annotation_list = list(annotation_dict)
+
 
 rule all:
     input: 
@@ -96,7 +103,7 @@ rule generate_dadi_fs:
         if len(samps) == 0: samps = ts.samples(population=0)
 
         if mask_file is not None:
-            mask_intervals = masks.get_mask_from_file(mask_file, wildcards.chrms)
+            mask_intervals = masks.get_mask_from_file_dfe(mask_file, wildcards.chrms)
         else:
             mask_intervals = None
 
@@ -134,14 +141,16 @@ rule dadi_generate_cache:
         output_dir + "/inference/{demog}/dadi/{dfes}/{annots}/{seeds}/{chrms}/pop{ids}/pop{ids}.two_epoch.spectra.bpkl"
     params:
         demog = 'two_epoch_sel',
-        sample_size = 10,
         grid_size = '800 1000 1200',
         gamma_pts = 2000
     threads: 8
-    shell:
+    run:
+        sample_size = int(demo_sample_size_dict[wildcards.demog][int(wildcards.ids)]) * 2 # haploid sample size
+        shell(        
         """
-        dadi-cli GenerateCache --model {params.demog} --demo-popt {input} --sample-size {params.sample_size} --output {output} --grids {params.grid_size} --gamma-pts {params.gamma_pts} --cpus {threads}
+        dadi-cli GenerateCache --model {params.demog} --demo-popt {input} --sample-size {sample_size} --output {output} --grids {params.grid_size} --gamma-pts {params.gamma_pts} --cpus {threads}
         """
+        )
 
 rule dadi_infer_dfe:
     input:
@@ -210,7 +219,7 @@ rule generate_polydfe_fs:
         if len(samps) > 20: samps = samps[:20]
 
         if mask_file is not None:
-            mask_intervals = masks.get_mask_from_file(mask_file, wildcards.chrms)
+            mask_intervals = masks.get_mask_from_file_dfe(mask_file, wildcards.chrms)
         else:
             mask_intervals = None
 
@@ -299,7 +308,7 @@ rule generate_dfe_alpha_fs:
         if len(samps) == 0: samps = ts.samples(population=0)
 
         if mask_file is not None:
-            mask_intervals = masks.get_mask_from_file(mask_file, wildcards.chrms)
+            mask_intervals = masks.get_mask_from_file_dfe(mask_file, wildcards.chrms)
         else:
             mask_intervals = None
 
@@ -379,7 +388,7 @@ rule generate_grapes_fs:
         data_description = wildcards.annots
 
         if mask_file is not None:
-            mask_intervals = masks.get_mask_from_file(mask_file, wildcards.chrms)
+            mask_intervals = masks.get_mask_from_file_dfe(mask_file, wildcards.chrms)
         else:
             mask_intervals = None
 
