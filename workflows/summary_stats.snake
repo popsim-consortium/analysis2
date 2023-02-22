@@ -130,6 +130,15 @@ def write_diploshic_sampleToPopFile(ts, filename, key):
                 count += 1
     f.close()
 
+def write_diploshic_ancestralAllelesFile(ts, filename):
+    seq = list("A" * int(ts.sequence_length))
+    with open(filename, "w") as f:
+        f.write(">1\n")
+        for v in ts.variants():
+            seq[int(v.site.position)] = v.alleles[0]
+        f.write(''.join(seq) + "\n")
+    f.close()
+
 rule make_diploshic_inputs:
     input:
         output_dir + "/simulated_data/{demog}/{dfes}/{annots}/{seeds}/sim_{chrms}.trees"
@@ -141,11 +150,7 @@ rule make_diploshic_inputs:
     run:
         ts = tskit.load(input[0])
         write_diploshic_sampleToPopFile(ts, output[0], wildcards.demog)
-        with open(output[1], "w") as f:
-            f.write(">ancestral\n")
-            seq = "".join(["0" for x in range(int(ts.sequence_length))])
-            f.write(seq)
-        f.close()
+        write_diploshic_ancestralAllelesFile(ts, output[1])
 
 def chunk_coords(chr, chunk, nchunks):
     seq_length = species.get_contig(chr).length
@@ -185,7 +190,7 @@ rule run_diploshic_fvs:
         """
         if [ {params.test} -eq 1 ]; 
             then
-                diploSHIC fvecVcf diploid {input[0]} 1 {params.seq_len} {output[0]} --sampleToPopFileName {input[1]} --ancFileName {input[2]} --targetPop {params.popid} --statFileName {output[1]} --segmentStart {params.start} --segmentEnd {params.end} 
+                diploSHIC fvecVcf haploid {input[0]} 1 {params.seq_len} {output[0]} --sampleToPopFileName {input[1]} --ancFileName {input[2]} --targetPop {params.popid} --statFileName {output[1]} --segmentStart {params.start} --segmentEnd {params.end} 
             else
                 touch {output[0]} && touch {output[1]}
         fi
@@ -268,8 +273,8 @@ rule plot_pi_allseeds:
         stacked = pd.concat(dfs)
         stacked.to_csv(output[1], sep="\t", index=False)
 
-        fig, axs = plt.subplots(ncols=1, nrows=3, figsize=(15, 20), sharex=True)
-        stat_names = ["pi", "tajD", "diplo_ZnS"]
+        fig, axs = plt.subplots(ncols=1, nrows=4, figsize=(15, 20), sharex=True)
+        stat_names = ["pi", "tajD", "H12", "ZnS"]
         for i, stat in enumerate(stat_names):
             sns.lineplot(data=stacked, x="mid", y=stat, hue="seed", alpha=0.5, ax=axs[i])
             # plot annotations as rugplot
