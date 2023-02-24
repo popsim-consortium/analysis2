@@ -188,9 +188,9 @@ rule run_diploshic_fvs:
 
     shell:
         """
-        if [ {params.test} -eq 1 ]; 
+        if [[ {params.test} -eq 1 && `diploSHIC fvecVcf haploid {input[0]} 1 {params.seq_len} {output[0]} --sampleToPopFileName {input[1]} --ancFileName {input[2]} --targetPop {params.popid} --statFileName {output[1]} --segmentStart {params.start} --segmentEnd {params.end}` == 0 ]]; 
             then
-                diploSHIC fvecVcf haploid {input[0]} 1 {params.seq_len} {output[0]} --sampleToPopFileName {input[1]} --ancFileName {input[2]} --targetPop {params.popid} --statFileName {output[1]} --segmentStart {params.start} --segmentEnd {params.end} 
+                echo "diploSHIC fvecVcf haploid {input[0]} 1 {params.seq_len} {output[0]} --sampleToPopFileName {input[1]} --ancFileName {input[2]} --targetPop {params.popid} --statFileName {output[1]} --segmentStart {params.start} --segmentEnd {params.end}"
             else
                 touch {output[0]} && touch {output[1]}
         fi
