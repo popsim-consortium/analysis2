@@ -270,7 +270,7 @@ rule plot_pi_allseeds:
             df["mid"] = df["start"] + (df["end"] - df["start"]) / 2
             df["seed"] = count
             count += 1
-        stacked = pd.concat(dfs)
+        stacked = pd.concat(dfs, ignore_index=True)
         stacked.to_csv(output[1], sep="\t", index=False)
 
         fig, axs = plt.subplots(ncols=1, nrows=4, figsize=(15, 20), sharex=True)
