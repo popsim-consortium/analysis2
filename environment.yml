@@ -32,3 +32,4 @@ dependencies:
     - git+https://github.com/popsim-consortium/stdpopsim.git
     - scikit-allel
     - git+https://github.com/xin-huang/dadi-cli
+    - diploSHIC
