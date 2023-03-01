@@ -12,8 +12,8 @@ genetic_map: HapMapII_GRCh38
 demo_model:
   id: OutOfAfrica_3G09
   samples: 
-    YRI: 1000
-    CEU: 1000
+    YRI: 10
+    CEU: 10
     CHB: 0
 
 # BGS configs

@@ -11,8 +11,8 @@ import math
 import subprocess
 from scipy.optimize import root_scalar
 
-#configfile: "workflows/config/snakemake/sweep_config.yaml"
-configfile: "workflows/config/snakemake/small_sweep.yaml"
+configfile: "workflows/config/snakemake/sweep_config.yaml"
+#configfile: "workflows/config/snakemake/small_sweep.yaml"
 
 rng = np.random.default_rng(seed=config["seed"])
 rng2 = np.random.default_rng(seed=config["seed"]+1)
@@ -79,12 +79,49 @@ region_size = config["region_size"]
 
 # -------------- Helper functions for making buffer around focal window ---------------
 
+
 def genetic_distance(ratemap, x, x0=0):
     """
     Function that returns the genetic distance (in cM) between positions x and 
     x0 based on a msprime.RateMap with recombination rates.
     """
     return 100*(ratemap.get_cumulative_mass(x) - ratemap.get_cumulative_mass(x0))
+
+
+def write_rec_rates(fname, ratemap, windows):
+    """
+    Function that writes a .tsv file with the recombination rates within the 
+    `windows`from a msprime.RateMap.
+    """
+    last = 0
+    fh = open(fname, 'w')
+    for start, end in windows:
+        cum_cM = ratemap.get_cumulative_mass(end)
+        print(f'{start}\t{end}\t{cum_cM}\t{cum_cM-last}', file=fh)
+        last = cum_cM
+    fh.close()
+
+def write_annot_density(fname, chrom, annot, windows):
+    annot_intervals = species.get_annotations(annot).get_chromosome_annotations(chrom)
+    ex_density = np.zeros(windows.shape[0])
+    for i, (start, end) in enumerate(windows):
+        for es, ee in annot_intervals:
+            if es > end:
+                break
+            # case where exon starts before window
+            if (es < start and ee >= start) :
+                # dealing with case where exon spans more than the entire window
+                tee = ee if ee < end else end
+                ex_density[i] += tee - start
+            elif es > start and es < end:
+                tee = ee if ee < end else end
+                ex_density[i] += tee - es
+    ex_density = ex_density / (windows[:,1] - windows[:,0])
+    fh = open(fname, 'w')
+    print('chr\tsim_left\tsim_right\toverlap\tannot', file=fh)
+    for ed, (start, end) in zip (ex_density, windows):
+        print(f'{chrom}\t{start}\t{end}\t{ed}\t{annot}', file=fh)
+    fh.close()
 
 
 def make_buffer(gmap, cM, left, right):
@@ -318,11 +355,7 @@ def compute_stats(ts, sample_sets, num_subwins=1):
     # removing duplicates if bleft/left or bright/right are the same
     windows_bpoints = np.unique(windows_bpoints)
     # something wonky happening with float conversion
-    if windows_bpoints[-1] == ts.sequence_length - 1:
-        windows_bpoints[-1] = ts.sequence_length
-    if windows_bpoints[-1]-ts.sequence_length > 0:
-        print(windows_bpoints[-1]-ts.sequence_length, flush=True)
-        windows_bpoints[-1] = ts.sequence_length
+    windows_bpoints[-1] = ts.sequence_length
     div = ts.diversity(sample_sets=sample_sets, windows=windows_bpoints, mode="site")
     windows = np.column_stack((windows_bpoints[:-1], windows_bpoints[1:]))
     assert windows.shape[0] == div.shape[0]
@@ -415,17 +448,30 @@ sw_outs_prefix = [output_dir +  f"/simulated_data/sweeps/sweep/{demo_model['id']
 
 trees_outs = [file_prefix+".trees" for file_prefix in neutral_outs_prefix + bgs_outs_prefix + sw_outs_prefix]
 stats_outs = [file_prefix+".stats.tsv" for file_prefix in neutral_outs_prefix + bgs_outs_prefix + sw_outs_prefix]
+annot_outs = [output_dir + f'/simulated_data/sweeps/annot_overlap_{annot}_{chrom}_{config["num_windows"]}.tsv' for annot in annotation_list]
 
 rule all:
     input:
-        boundary_outs + trees_outs + stats_outs + [output_dir + f'/simulated_data/sweeps/all_sims.stats.tsv']
+        boundary_outs + trees_outs + stats_outs + [output_dir + f'/simulated_data/sweeps/all_sims.stats.tsv', output_dir+f'/simulated_data/sweeps/rec_map_{chrom}_{config["num_windows"]}.tsv'] + annot_outs
 
+rule write_rec:
+    input:
+    output: output_dir + f'/simulated_data/sweeps/rec_map_{chrom}_{config["num_windows"]}.tsv'
+    run:
+        write_rec_rates(output[0], recmap, windows)
+
+rule write_annot:
+    input:
+    output: output_dir + f'/simulated_data/sweeps/annot_overlap_{{annot}}_{{chrom}}_{config["num_windows"]}.tsv'
+    run:
+        print(windows)
+        write_annot_density(output[0], wildcards.chrom, wildcards.annot, windows)
 
 rule boundary_sims:
     input:
     output:
         output_dir + "/simulated_data/sweeps/boundary_sims/sim_{seed}_{region_size}.trees"
-    resources: time=6000, mem_mb=16000
+    resources: time=6000, mem_mb=6000
     run:
         model = species.get_demographic_model(demo_model["id"])
         mut_rate = model.mutation_rate 
@@ -486,7 +532,7 @@ rule bgs:
     input:
     output:
         output_dir + f"/simulated_data/sweeps/bgs/{demo_model['id']}/{{annot}}/{{dfe}}/{{seed}}/sim_{chrom}_{{left}}_{{right}}.trees", 
-    resources: time=3000, mem_mb=4000
+    resources: time=3000, mem_mb=3000
     run:
         model = species.get_demographic_model(demo_model["id"])
         mutation_rate = model.mutation_rate
@@ -525,7 +571,7 @@ rule sweep:
     input:
     output:
         output_dir + f"/simulated_data/sweeps/sweep/{demo_model['id']}/{{popu}}/{{annot}}/{{dfe}}/{{coeff}}/{{tmult}}/{{seed}}/sim_{{chrom}}_{{left}}_{{right}}.trees", 
-    resources: time=3000, mem_mb=4000
+    resources: time=3000, mem_mb=8000
     run:
         model = species.get_demographic_model(demo_model["id"])
         mutation_rate = model.mutation_rate
@@ -622,7 +668,7 @@ rule merge_stats:
     input: stats_outs
     output:
         output_dir + f'/simulated_data/sweeps/all_sims.stats.tsv'
-    resources: time=3000, mem_mb=16000, disk_mb=16000
+    resources: time=3000, mem_mb=48000, disk_mb=48000
     run:
         #print(input, flush=True)
         #import pdb; pdb.set_trace()
