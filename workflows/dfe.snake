@@ -347,7 +347,7 @@ rule get_dfe_alpha_bestfits:
         output_dir + "/inference/{demog}/DFE-alpha/{dfes}/{annots}/{seeds}/{chrms}/pop{ids}/pop{ids}.DFE-alpha.bestfit"
     shell:
         """
-        cat {input} | awk -v id={wildcards.ids} 'BEGIN{{OFS="\\t"}}{{print "pop"id,$22,$10,$12}}' | sed '1ipop_id\\tlikelihood\\tb\\tEs' > {output}
+        cat {input} | awk -v id={wildcards.ids} 'BEGIN{{OFS="\\t"}}{{print "pop"id,$16,$10,$12}}' | sed '1ipop_id\\tlikelihood\\tb\\tEs' > {output}
         """
 
 # ###############################################################################
