@@ -76,20 +76,6 @@ rule all:
                 "vcf",
                 ],
         ),
-       # expand(
-       #     [output_dir + "/summaries/{demog}/{dfes}/{annots}/{{seeds}}/sim_{{chrms}}.{popid}.{{chunk}}.{{exts}}".format(
-       #         dfes=DFE, annots=ANNOT, popid=POPID, demog=DEMOG)
-       #             for (POPID, DEMOG, DFE, ANNOT) in [item 
-       #                 for xx in [[(i, z[0],z[1][0],z[1][1]) 
-       #                 for i in demo_pop_ids[z[0]]] 
-       #                 for z in [ x 
-       #                     for x in itertools.product(demo_model_ids, zip(dfe_list, annotation_list))]] 
-       #                     for item in xx]],
-       #     seeds=seed_array,
-       #     chrms=chrm_list,
-       #     chunk=chunks,
-       #     exts=["diploshic.fvec", "diploshic.stats"],
-       # ),
         expand(
             [output_dir + "/summaries/{demog}/{dfes}/{annots}/{{seeds}}/sim_{{chrms}}.{popid}.{{exts}}".format(
                 dfes=DFE, annots=ANNOT, popid=POPID, demog=DEMOG) for (POPID, DEMOG, DFE, ANNOT) in [item for xx in [[(i, z[0],z[1][0],z[1][1]) for i in demo_pop_ids[z[0]]] for z in [ x for x in itertools.product(demo_model_ids, zip(dfe_list, annotation_list))]] for item in xx]],
@@ -144,9 +130,8 @@ rule make_diploshic_inputs:
         output_dir + "/simulated_data/{demog}/{dfes}/{annots}/{seeds}/sim_{chrms}.trees"
 
     output:
-        output_dir + "/summaries/{demog}/{dfes}/{annots}/{seeds}/sim_{chrms}.sampleToPopFile",
-        output_dir + "/summaries/{demog}/{dfes}/{annots}/{seeds}/sim_{chrms}.ancestralAllelesFile"
-
+        temp(output_dir + "/summaries/{demog}/{dfes}/{annots}/{seeds}/sim_{chrms}.sampleToPopFile"),
+        temp(output_dir + "/summaries/{demog}/{dfes}/{annots}/{seeds}/sim_{chrms}.ancestralAllelesFile")
     run:
         ts = tskit.load(input[0])
         write_diploshic_sampleToPopFile(ts, output[0], wildcards.demog)
@@ -173,11 +158,12 @@ rule run_diploshic_fvs:
         rules.make_diploshic_inputs.output
 
     output:
-        expand(output_dir + "/summaries/{{demog}}/{{dfes}}/{{annots}}/{{seeds}}/sim_{{chrms}}.{{popid}}.{{chunk}}.diploshic.{ext}",
+        temp(
+            expand(output_dir + "/summaries/{{demog}}/{{dfes}}/{{annots}}/{{seeds}}/sim_{{chrms}}.{{popid}}.{{chunk}}.diploshic.{ext}",
             chunk=chunks,
             ext=["fvec", "stats"],        
             )
-
+        )
 
     params:
         seq_len = lambda wildcards, input: int(species.get_contig(wildcards.chrms).length), 
