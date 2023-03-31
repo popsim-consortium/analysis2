@@ -31,7 +31,6 @@ import masks
 # ###############################################################################
 
 # A seed to replicate results
-# TODO mutation rates
 
 configfile: "workflows/config/snakemake/tiny_config.yaml"
 
@@ -78,13 +77,6 @@ if "chrY" in chrm_list:
 if(config["chrm_list"] != "all"):
     chrm_list = [chr for chr in config["chrm_list"].split(",")]
 
-
-# This grabs the default mr from the first chromosome,
-# Ultimitely This needs to be replaced with the weighted average
-# of all chromosomes: This should be done in stdpopsim. 
-mutation_rate = species.genome.mean_mutation_rate
-
-
 # The specific demographic model you would like to run
 demo_model_array = config["demo_models"]
 demo_model_ids = [x["id"] for x in demo_model_array]
@@ -115,12 +107,6 @@ def pop_expand(output_dir, method, filename="temp.txt"):
 # GENERAL RULES & GLOBALS
 # ###############################################################################
 
-#module simulation_workflow:
-#    snakefile:
-#        "simulation.snake"
-#    config: config
-#use rule * from simulation_workflow as simulation_*
-
 slim_scaling_factor = config["slim_scaling_factor"]
 seed_array = np.random.random_integers(1,2**31,replicates)
 genetic_map_downloaded_flag= ".genetic_map_downloaded"
@@ -131,15 +117,6 @@ try:
     mask_file = config["mask_file"]
 except KeyError:
     mask_file = None
-
-#localrules:
-#    download_genetic_map,
-#    download_msmc,
-#    sp_download,
-#    clone_smcpp,
-#    gone_clone,
-#    gone_copy,
-#    gone_params,
 
 
 rule all:
@@ -182,6 +159,12 @@ def generation_time_helper(demog, species):
         generation_time = species.get_demographic_model(demog).generation_time
     return generation_time
 
+def mutation_rate_helper(demog, species):
+    if demog == "Constant":
+        mutation_rate = species.genome.mean_mutation_rate
+    else:
+        mutation_rate = species.get_demographic_model(demog).mutation_rate
+    return mutation_rate
 
 rule write_bdd:
     output:
@@ -277,7 +260,7 @@ rule run_stairwayplot:
         runner.run_theta_estimation(max_workers=threads, show_progress=True)
         runner.run_summary(
             output,
-            mutation_rate=mutation_rate,
+            mutation_rate=mutation_rate_helper(wildcards.demog, species),
             generation_time=generation_time_helper(wildcards.demog, species),
         )
 
@@ -394,7 +377,7 @@ rule convert_msmc:
         output_dir + "/inference/{demog}/msmc/{dfes}/{annots}/{seeds}/{pops}/msmc_estimated_Ne.txt"
     run:
         msmc.convert_msmc_output(input[0], output[0],
-            mutation_rate=mutation_rate,
+            mutation_rate=mutation_rate_helper(wildcards.demog, species),
             generation_time=generation_time_helper(wildcards.demog, species)
         )
 
@@ -613,7 +596,7 @@ rule run_smcpp:
         cur = os.getcwd()
         os.chdir(f"{output_dir}/inference/{wildcards.demog}/smcpp/{wildcards.dfes}/{wildcards.annots}/{wildcards.seeds}/{wildcards.pops}")
         base = f"trees.smc.gz"
-        mutation_rate = species.genome.mean_mutation_rate
+        mutation_rate=mutation_rate_helper(wildcards.demog, species)
         smc.run_smcpp_estimate(base, mutation_rate=mutation_rate, ncores=threads)
         # need to cd out of subdir for snakemake sanity
         os.chdir(cur)
