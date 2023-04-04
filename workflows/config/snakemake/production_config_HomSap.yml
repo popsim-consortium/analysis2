@@ -1,5 +1,3 @@
-"population_id": [0] # (what is this a setting for?)
-
 # snakemake settings
 "seed": 12345
 "replicates": 3
@@ -12,17 +10,17 @@
     "num_samples_per_population": [100],
     },
     {"id":"OutOfAfrica_3G09",
-    "num_samples_per_population": [100,100,100],
+    "num_samples_per_population": 3*[100], # shared 'n'; order of pops unclear
     }
     {"id":"OutOfAfricaArchaicAdmixture_5R19",
-    "num_samples_per_population": [100,100,100],
+    "num_samples_per_population": 3*[100],
     }
 ]
-"genetic_map": "HapMapII_GRCh37"
+"genetic_map": "HapMapII_GRCh38"
 "chrm_list": "chr1, chr2, chr3, chr4, chr5, chr6, chr7, chr8, chr9, chr10, chr11, chr12, chr13, chr14, chr15, chr16, chr17, chr18, chr19, chr20, chr21"
 "dfe_list": ["none", "Gamma_H17"]
 "annotation_list": ["all_sites", "ensembl_havana_104_exons"]
-"mask_file": "workflows/masks/HapmapII_GRCh37.mask.bed"
+"mask_file": "workflows/masks/HapmapII_GRCh38.mask.bed"
 "stairway_annot_mask" : "" # set this or any of the below to 'none' to skip annot masking
 "msmc_annot_mask" : ""
 "gone_annot_mask" : ""
@@ -35,7 +33,6 @@
 # n(t) specific configs
 "methods" : ["stairwayplot", "gone", "smcpp", "msmc"]
 "num_sampled_genomes_msmc" : [6]
-"num_sampled_genomes_per_replicate": [2]
 "num_msmc_iterations" : 20
 "gone_phase" : 1  # 0 for pseudohaploid, 1 for phased, 2 for unknown phase
 "gone_max_snps" : 50000  # default=50000

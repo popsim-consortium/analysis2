@@ -1,5 +1,4 @@
 "seed": 12345
-"population_id": 0
 "num_samples_per_population": [10, 0, 0]
 "replicates": 2
 "species": "HomSap"
@@ -10,7 +9,5 @@
 "dfe_list": ["Gamma_H17"]
 "output_dir": "results"
 "poly_dfe_exec": "../ext/polyDFE/polyDFE-2.0-linux-64-bit"
-"num_sampled_genomes_msmc" : "2,8"
-"num_sampled_genomes_per_replicate": "2,8"
 "num_msmc_iterations" : 20
 "slim_scaling_factor": 10

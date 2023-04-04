@@ -1,5 +1,4 @@
 "seed": 12345
-"population_id": 0
 "num_samples_per_population": [10, 10, 10]
 "replicates": 3
 
@@ -30,7 +29,6 @@
 # n(t) specific configs
 
 "num_sampled_genomes_msmc": [2]
-"num_sampled_genomes_per_replicate": [2]
 "num_msmc_iterations": 3
 
 "annotation_list": ["ensembl_havana_104_exons"]

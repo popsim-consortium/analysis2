@@ -1,5 +1,4 @@
 "seed": 12345
-"population_id": [0]
 "replicates": 2
 
 "species": "HomSap"
@@ -31,7 +30,6 @@
 "methods" : ["stairwayplot", "gone", "smcpp", "msmc"]
 
 "num_sampled_genomes_msmc" : [6]
-"num_sampled_genomes_per_replicate": [2]  # I dont use this, not sure what is purpose?
 "num_msmc_iterations" : 20
 
 "gone_phase" : 1  # 0 for pseudohaploid, 1 for phased, 2 for unknown phase
