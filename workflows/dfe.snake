@@ -61,25 +61,26 @@ demo_model_id_list = [x["id"] for x in demo_model_array]
 demo_sample_size_dict = {}
 for x in demo_model_array:
     demo_sample_size_dict[x["id"]] = x["num_samples_per_population"]
+pids = list(map(str,np.arange(len(x["num_samples_per_population"]))))
 
 # Select DFE model from catalog  
-#dfe_list = config["dfe_list"]   
-#annotation_list = config["annotation_list"]
 dfe_dict = dict.fromkeys(config["dfe_list"])
-del dfe_dict["none"]
+if "none" in dfe_dict:
+   del dfe_dict["none"]	
 dfe_list = list(dfe_dict)
 annotation_dict = dict.fromkeys(config["annotation_list"])
-del annotation_dict["none"]
+if "none" in annotation_dict:
+    del annotation_dict["none"]
 annotation_list = list(annotation_dict)
 
 
 rule all:
     input: 
-        expand(output_dir + "/plots/{demog}/{chrms}/{dfes}/{annots}/dfe.inference.benchmark.pdf",
-            chrms=chrm_list,
+        expand(output_dir + "/plots/{demog}/{dfes}/{annots}/dfe.inference.benchmark.pdf",
             demog=demo_model_id_list,
             dfes=dfe_list,
             annots=annotation_list )
+
 
 # ###############################################################################
 # dadi
@@ -87,38 +88,28 @@ rule all:
 
 rule generate_dadi_fs:
     input:
-        output_dir + "/simulated_data/{demog}/{dfes}/{annots}/{seeds}/sim_{chrms}.trees"
+        expand(output_dir + "/simulated_data/{demog}/{dfes}/{annots}/{seeds}/sim_{chrms}.trees",
+            seeds=seed_list,
+            demog=demo_model_id_list,
+            dfes=dfe_list,
+            annots=annotation_list,
+            chrms=chrm_list,),
     output:
-        output_dir + "/inference/{demog}/dadi/{dfes}/{annots}/{seeds}/{chrms}/pop{ids}/pop{ids}.dadi.neu.fs",
-        output_dir + "/inference/{demog}/dadi/{dfes}/{annots}/{seeds}/{chrms}/pop{ids}/pop{ids}.dadi.nonneu.fs"
+        output_dir + "/inference/{demog}/dadi/{dfes}/{annots}/{seeds}/pop{ids}/pop{ids}.dadi.neu.fs",
+        output_dir + "/inference/{demog}/dadi/{dfes}/{annots}/{seeds}/pop{ids}/pop{ids}.dadi.nonneu.fs"
     run:
-        contig = species.get_contig(wildcards.chrms)
-        seq_len = contig.recombination_map.sequence_length
-        neu_prop = 0.3
-        nonneu_prop = 0.7
-
-        ts = tskit.load(input[0])
+        ts_dict = {}
+        for chrm in chrm_list:
+            fp = os.path.join(output_dir, "simulated_data", wildcards.demog, wildcards.dfes, wildcards.annots, wildcards.seeds, "sim_"+chrm+".trees")
+            ts_dict[chrm] = fp
         index = int(wildcards.ids)
-        samps = ts.samples(population=index)
-        if len(samps) == 0: samps = ts.samples(population=0)
-
-        if mask_file is not None:
-            mask_intervals = masks.get_mask_from_file_dfe(mask_file, wildcards.chrms)
-        else:
-            mask_intervals = None
-
-        if (wildcards.annots != "all_sites") and (wildcards.annots != "none"):
-            annot = species.get_annotations(wildcards.annots)
-            annot_intervals = annot.get_chromosome_annotations(wildcards.chrms)
-            ts2fs.generate_fs(ts, samps, output, coding_intervals=annot_intervals, mask_intervals=mask_intervals, format='dadi')
-        else:
-            ts2fs.generate_fs(ts, samps, output, mask_intervals=mask_intervals, format='dadi')
+        ts2fs.generate_fs(ts_dict, index, mask_file, wildcards.annots, species, output, format='dadi')
 
 rule dadi_infer_dm:
     input: 
-        output_dir + "/inference/{demog}/dadi/{dfes}/{annots}/{seeds}/{chrms}/pop{ids}/pop{ids}.dadi.neu.fs",
+        output_dir + "/inference/{demog}/dadi/{dfes}/{annots}/{seeds}/pop{ids}/pop{ids}.dadi.neu.fs",
     output:
-        output_dir + "/inference/{demog}/dadi/{dfes}/{annots}/{seeds}/{chrms}/pop{ids}/pop{ids}.two_epoch.InferDM.bestfits"
+        output_dir + "/inference/{demog}/dadi/{dfes}/{annots}/{seeds}/pop{ids}/pop{ids}.two_epoch.InferDM.bestfits"
     params:
         demog = 'two_epoch',
         demog_p0 = '5 5',
@@ -126,7 +117,7 @@ rule dadi_infer_dm:
         demog_lbounds = '10e-3 10e-3',
         grid_size = '300 400 500',
         opts = 100,
-        prefix = output_dir + "/inference/{demog}/dadi/{dfes}/{annots}/{seeds}/{chrms}/pop{ids}/pop{ids}.two_epoch"
+        prefix = output_dir + "/inference/{demog}/dadi/{dfes}/{annots}/{seeds}/pop{ids}/pop{ids}.two_epoch"
     threads: 8
     shell:
         """
@@ -138,7 +129,7 @@ rule dadi_generate_cache:
     input:
         rules.dadi_infer_dm.output
     output:
-        output_dir + "/inference/{demog}/dadi/{dfes}/{annots}/{seeds}/{chrms}/pop{ids}/pop{ids}.two_epoch.spectra.bpkl"
+        output_dir + "/inference/{demog}/dadi/{dfes}/{annots}/{seeds}/pop{ids}/pop{ids}.two_epoch.spectra.bpkl"
     params:
         demog = 'two_epoch_sel',
         grid_size = '800 1000 1200',
@@ -154,11 +145,11 @@ rule dadi_generate_cache:
 
 rule dadi_infer_dfe:
     input:
-        output_dir + "/inference/{demog}/dadi/{dfes}/{annots}/{seeds}/{chrms}/pop{ids}/pop{ids}.dadi.nonneu.fs",
-        output_dir + "/inference/{demog}/dadi/{dfes}/{annots}/{seeds}/{chrms}/pop{ids}/pop{ids}.two_epoch.spectra.bpkl",
-        output_dir + "/inference/{demog}/dadi/{dfes}/{annots}/{seeds}/{chrms}/pop{ids}/pop{ids}.two_epoch.InferDM.bestfits"
+        output_dir + "/inference/{demog}/dadi/{dfes}/{annots}/{seeds}/pop{ids}/pop{ids}.dadi.nonneu.fs",
+        output_dir + "/inference/{demog}/dadi/{dfes}/{annots}/{seeds}/pop{ids}/pop{ids}.two_epoch.spectra.bpkl",
+        output_dir + "/inference/{demog}/dadi/{dfes}/{annots}/{seeds}/pop{ids}/pop{ids}.two_epoch.InferDM.bestfits"
     output:
-        output_dir + "/inference/{demog}/dadi/{dfes}/{annots}/{seeds}/{chrms}/pop{ids}/pop{ids}.two_epoch.gamma.InferDFE.bestfits",
+        output_dir + "/inference/{demog}/dadi/{dfes}/{annots}/{seeds}/pop{ids}/pop{ids}.two_epoch.gamma.InferDFE.bestfits",
     params:
         dfe = 'gamma',
         dfe_p0 = '0.5 1000',
@@ -166,7 +157,7 @@ rule dadi_infer_dfe:
         dfe_ubounds = '1 50000',
         ratio = 2.31,
         opts = 100,
-        prefix = output_dir + "/inference/{demog}/dadi/{dfes}/{annots}/{seeds}/{chrms}/pop{ids}/pop{ids}.two_epoch.gamma"
+        prefix = output_dir + "/inference/{demog}/dadi/{dfes}/{annots}/{seeds}/pop{ids}/pop{ids}.two_epoch.gamma"
     threads: 8
     shell:
         """
@@ -178,7 +169,7 @@ rule get_dadi_dfe_bestfits:
     input:
         rules.dadi_infer_dfe.output
     output:
-        output_dir + "/inference/{demog}/dadi/{dfes}/{annots}/{seeds}/{chrms}/pop{ids}/pop{ids}.dadi.bestfit"
+        output_dir + "/inference/{demog}/dadi/{dfes}/{annots}/{seeds}/pop{ids}/pop{ids}.dadi.bestfit"
     shell:
         """
         grep 'Converged results' {input} -A 2 | tail -1 | awk -v id={wildcards.ids} '{{print "pop"id"\\t"$0}}' | sed '1ipop_id\\tlikelihood\\tshape\\tscale\\ttheta' > {output}
@@ -203,44 +194,31 @@ rule download_polydfe:
 
 rule generate_polydfe_fs:
     input:
-        output_dir + "/simulated_data/{demog}/{dfes}/{annots}/{seeds}/sim_{chrms}.trees",
+        expand(output_dir + "/simulated_data/{{demog}}/{{dfes}}/{{annots}}/{{seeds}}/sim_{chrms}.trees",
+            chrms=chrm_list),
     output:
-        output_dir + "/inference/{demog}/polyDFE/{dfes}/{annots}/{seeds}/{chrms}/pop{ids}/pop{ids}.polyDFE.fs"
+        output_dir + "/inference/{demog}/polyDFE/{dfes}/{annots}/{seeds}/pop{ids}/pop{ids}.polyDFE.fs"
     run:
-        contig = species.get_contig(wildcards.chrms)
-        seq_len = contig.recombination_map.sequence_length
+        ts_dict = {}
+        for chrm in chrm_list:
+            fp = os.path.join(output_dir, "simulated_data", wildcards.demog, wildcards.dfes, wildcards.annots, wildcards.seeds, "sim_"+chrm+".trees")
+            ts_dict[chrm] = fp
+        index = int(wildcards.ids)
         neu_prop = 0.3
         nonneu_prop = 0.7
+        max_haplos = 20
+        ts2fs.generate_fs(ts_dict, index, mask_file, wildcards.annots,
+                  species, output, format='polyDFE', max_haplos=max_haplos,
+                  neu_prop=neu_prop, nonneu_prop=nonneu_prop)
 
-        ts = tskit.load(input[0])
-        index = int(wildcards.ids)
-        samps = ts.samples(population=index)
-        if len(samps) == 0: samps = ts.samples(population=0)
-        if len(samps) > 20: samps = samps[:20]
 
-        if mask_file is not None:
-            mask_intervals = masks.get_mask_from_file_dfe(mask_file, wildcards.chrms)
-        else:
-            mask_intervals = None
-
-        if (wildcards.annots != "all_sites") and (wildcards.annots != "none"):
-            annot = species.get_annotations(wildcards.annots)
-            annot_intervals = annot.get_chromosome_annotations(wildcards.chrms)
-            exon_len = np.sum(annot_intervals[:,1]-annot_intervals[:,0])
-            ts2fs.generate_fs(ts, samps, output, coding_intervals=annot_intervals, 
-                              mask_intervals=mask_intervals, format='polyDFE', seq_len=exon_len, 
-                              neu_prop=neu_prop, nonneu_prop=nonneu_prop, sample_size=len(samps))
-        else:
-            ts2fs.generate_fs(ts, samps, output, mask_intervals=mask_intervals, 
-                              format='polyDFE', seq_len=seq_len, neu_prop=neu_prop, 
-                              nonneu_prop=nonneu_prop, sample_size=len(samps))
 
 rule run_polydfe:
     input: 
         rules.generate_polydfe_fs.output,
         rules.download_polydfe.output,
     output: 
-        output_dir + "/inference/{demog}/polyDFE/{dfes}/{annots}/{seeds}/{chrms}/pop{ids}/pop{ids}.polyDFE.out"
+        output_dir + "/inference/{demog}/polyDFE/{dfes}/{annots}/{seeds}/pop{ids}/pop{ids}.polyDFE.out"
     params:
         exec=poly_dfe_exec
     shell:
@@ -252,7 +230,7 @@ rule get_polydfe_bestfit:
     input:
         rules.run_polydfe.output
     output:
-        output_dir + "/inference/{demog}/polyDFE/{dfes}/{annots}/{seeds}/{chrms}/pop{ids}/pop{ids}.polyDFE.bestfit"
+        output_dir + "/inference/{demog}/polyDFE/{dfes}/{annots}/{seeds}/pop{ids}/pop{ids}.polyDFE.bestfit"
     shell:
         """
         paste <(echo pop{wildcards.ids}) \
@@ -289,49 +267,34 @@ rule download_dfe_alpha:
         
 rule generate_dfe_alpha_fs:
     input:
-        output_dir + "/simulated_data/{demog}/{dfes}/{annots}/{seeds}/sim_{chrms}.trees",
+        expand(output_dir + "/simulated_data/{{demog}}/{{dfes}}/{{annots}}/{{seeds}}/sim_{chrms}.trees",
+            chrms=chrm_list),
         rules.download_dfe_alpha.output,
     output:
-        output_dir + "/inference/{demog}/DFE-alpha/{dfes}/{annots}/{seeds}/{chrms}/pop{ids}/pop{ids}.DFE-alpha.neu.config",
-        output_dir + "/inference/{demog}/DFE-alpha/{dfes}/{annots}/{seeds}/{chrms}/pop{ids}/pop{ids}.DFE-alpha.nonneu.config",
-        output_dir + "/inference/{demog}/DFE-alpha/{dfes}/{annots}/{seeds}/{chrms}/pop{ids}/pop{ids}.DFE-alpha.fs"    
+        output_dir + "/inference/{demog}/DFE-alpha/{dfes}/{annots}/{seeds}/pop{ids}/pop{ids}.DFE-alpha.neu.config",
+        output_dir + "/inference/{demog}/DFE-alpha/{dfes}/{annots}/{seeds}/pop{ids}/pop{ids}.DFE-alpha.nonneu.config",
+        output_dir + "/inference/{demog}/DFE-alpha/{dfes}/{annots}/{seeds}/pop{ids}/pop{ids}.DFE-alpha.fs"    
     params:
-        output = output_dir + "/inference/{demog}/DFE-alpha/{dfes}/{annots}/{seeds}/{chrms}/pop{ids}"
+        output = output_dir + "/inference/{demog}/DFE-alpha/{dfes}/{annots}/{seeds}/pop{ids}"
     run:
-        contig = species.get_contig(wildcards.chrms)
-        print(input[0], file=sys.stderr, flush=True)
-
-        ts = tskit.load(input[0])
-
+        ts_dict = {}
+        for chrm in chrm_list:
+            fp = os.path.join(output_dir, "simulated_data", wildcards.demog, wildcards.dfes, wildcards.annots, wildcards.seeds, "sim_"+chrm+".trees")
+            ts_dict[chrm] = fp
         index = int(wildcards.ids)
-        samps = ts.samples(population=index)
-        if len(samps) == 0: samps = ts.samples(population=0)
+        ts2fs.generate_fs(ts_dict, index, mask_file, wildcards.annots,
+                  species, output, format='DFE-alpha', is_folded=True,
+                  data_path_1=dfe_alpha_data_path_1, data_path_2=dfe_alpha_data_path_2,
+                  sfs_input_file=output[2], est_dfe_results_dir=params.output,
+                  est_dfe_demography_results_file=params.output+"/neu/est_dfe.out")
 
-        if mask_file is not None:
-            mask_intervals = masks.get_mask_from_file_dfe(mask_file, wildcards.chrms)
-        else:
-            mask_intervals = None
 
-        if (wildcards.annots != "all_sites") and (wildcards.annots != "none"):
-            annot = species.get_annotations(wildcards.annots)
-            annot_intervals = annot.get_chromosome_annotations(wildcards.chrms)
-            ts2fs.generate_fs(ts, samps, output, coding_intervals=annot_intervals, 
-                              mask_intervals=mask_intervals, format='DFE-alpha', is_folded=True, 
-                              data_path_1=dfe_alpha_data_path_1, data_path_2=dfe_alpha_data_path_2, 
-                              sfs_input_file=output[2], est_dfe_results_dir=params.output, 
-                              est_dfe_demography_results_file=params.output+"/neu/est_dfe.out")
-        else:
-            ts2fs.generate_fs(ts, samps, output, 
-                              mask_intervals=mask_intervals, format='DFE-alpha', is_folded=True, 
-                              data_path_1=dfe_alpha_data_path_1, data_path_2=dfe_alpha_data_path_2, 
-                              sfs_input_file=output[2], est_dfe_results_dir=params.output, 
-                              est_dfe_demography_results_file=params.output+"/neu/est_dfe.out")
 
 rule run_dfe_alpha:
     input:
         rules.generate_dfe_alpha_fs.output
     output:
-        output_dir + "/inference/{demog}/DFE-alpha/{dfes}/{annots}/{seeds}/{chrms}/pop{ids}/nonneu/est_dfe.out"
+        output_dir + "/inference/{demog}/DFE-alpha/{dfes}/{annots}/{seeds}/pop{ids}/nonneu/est_dfe.out"
     params:
         exec=dfe_alpha_exec
     shell:
@@ -344,7 +307,7 @@ rule get_dfe_alpha_bestfits:
     input:
         rules.run_dfe_alpha.output
     output:
-        output_dir + "/inference/{demog}/DFE-alpha/{dfes}/{annots}/{seeds}/{chrms}/pop{ids}/pop{ids}.DFE-alpha.bestfit"
+        output_dir + "/inference/{demog}/DFE-alpha/{dfes}/{annots}/{seeds}/pop{ids}/pop{ids}.DFE-alpha.bestfit"
     shell:
         """
         cat {input} | awk -v id={wildcards.ids} 'BEGIN{{OFS="\\t"}}{{print "pop"id,$16,$10,$12}}' | sed '1ipop_id\\tlikelihood\\tb\\tEs' > {output}
@@ -370,48 +333,33 @@ rule download_grapes:
 rule generate_grapes_fs:
     input:
         rules.download_grapes.output,
-        output_dir + "/simulated_data/{demog}/{dfes}/{annots}/{seeds}/sim_{chrms}.trees"
+        expand(output_dir + "/simulated_data/{{demog}}/{{dfes}}/{{annots}}/{{seeds}}/sim_{chrms}.trees",
+            chrms=chrm_list),
     output:
-        output_dir + "/inference/{demog}/grapes/{dfes}/{annots}/{seeds}/{chrms}/pop{ids}/pop{ids}.grapes.fs"        
+        output_dir + "/inference/{demog}/grapes/{dfes}/{annots}/{seeds}/pop{ids}/pop{ids}.grapes.fs"        
     run:
-        contig = species.get_contig(wildcards.chrms)
-        seq_len = contig.recombination_map.sequence_length
+        ts_dict = {}
+        for chrm in chrm_list:
+            fp = os.path.join(output_dir, "simulated_data", wildcards.demog, wildcards.dfes, wildcards.annots, wildcards.seeds, "sim_"+chrm+".trees")
+            ts_dict[chrm] = fp
+        index = int(wildcards.ids)
         neu_prop = 0.3
         nonneu_prop = 0.7
-
-        ts = tskit.load(input[1])
-        index = int(wildcards.ids)
-        samps = ts.samples(population=index)
-        if len(samps) == 0: samps = ts.samples(population=0)
-
-        header = species.common_name + " " + wildcards.chrms
+        header = species.common_name # (old: header = species.common_name + " " + chrm)
         data_description = wildcards.annots
+        ts2fs.generate_fs(ts_dict, index, mask_file, wildcards.annots,
+                  species, output, format='grapes', header=header,
+                  data_description=data_description, neu_prop=neu_prop,
+                  nonneu_prop=nonneu_prop,)
 
-        if mask_file is not None:
-            mask_intervals = masks.get_mask_from_file_dfe(mask_file, wildcards.chrms)
-        else:
-            mask_intervals = None
 
-        if (wildcards.annots != "all_sites") and (wildcards.annots != "none"):
-            annot = species.get_annotations(wildcards.annots)
-            annot_intervals = annot.get_chromosome_annotations(wildcards.chrms)
-            exon_len = np.sum(annot_intervals[:,1]-annot_intervals[:,0])
-            ts2fs.generate_fs(ts, samps, output, coding_intervals=annot_intervals, 
-                              mask_intervals=mask_intervals, format='grapes', header=header, 
-                              data_description=data_description, seq_len=exon_len, 
-                              neu_prop=neu_prop, nonneu_prop=nonneu_prop, sample_size=len(samps))
-        else:
-            ts2fs.generate_fs(ts, samps, output, 
-                              mask_intervals=mask_intervals, format='grapes', header=header, 
-                              data_description=data_description, seq_len=seq_len, 
-                              neu_prop=neu_prop, nonneu_prop=nonneu_prop, sample_size=len(samps))
 
 rule run_grapes:
     input:
         rules.generate_grapes_fs.output
     output:
-        output_dir + "/inference/{demog}/grapes/{dfes}/{annots}/{seeds}/{chrms}/pop{ids}/pop{ids}.grapes.ept.fs",
-        output_dir + "/inference/{demog}/grapes/{dfes}/{annots}/{seeds}/{chrms}/pop{ids}/pop{ids}.grapes.out"
+        output_dir + "/inference/{demog}/grapes/{dfes}/{annots}/{seeds}/pop{ids}/pop{ids}.grapes.ept.fs",
+        output_dir + "/inference/{demog}/grapes/{dfes}/{annots}/{seeds}/pop{ids}/pop{ids}.grapes.out"
     params:
         exec=grapes_exec
     shell:
@@ -421,9 +369,9 @@ rule run_grapes:
 
 rule get_grapes_bestfits:
     input:
-        output_dir + "/inference/{demog}/grapes/{dfes}/{annots}/{seeds}/{chrms}/pop{ids}/pop{ids}.grapes.out"
+        output_dir + "/inference/{demog}/grapes/{dfes}/{annots}/{seeds}/pop{ids}/pop{ids}.grapes.out"
     output:
-        output_dir + "/inference/{demog}/grapes/{dfes}/{annots}/{seeds}/{chrms}/pop{ids}/pop{ids}.grapes.bestfit"
+        output_dir + "/inference/{demog}/grapes/{dfes}/{annots}/{seeds}/pop{ids}/pop{ids}.grapes.bestfit"
     shell:
         """
         grep Separate -A 4 {input} | sed '1d' | awk -F ": " '{{print $2}}' | awk -v id={wildcards.ids} 'BEGIN{{RS="\\t";FS="\\n";OFS="\\t"}}{{print "pop"id,$1,$2,$3,$4}}' | sed '1ipop_id\\tlikelihood\\tshape\\tEs\\ttheta' > {output}
@@ -435,43 +383,51 @@ rule get_grapes_bestfits:
 
 rule plot_results:
     input:
-        dadi_res = expand(output_dir + "/inference/{demog}/dadi/{dfes}/{annots}/{seeds}/{chrms}/pop{ids}/pop{ids}.dadi.bestfit", 
+        dadi_res = expand(output_dir + "/inference/{demog}/dadi/{dfes}/{annots}/{seeds}/pop{ids}/pop{ids}.dadi.bestfit", 
             demog=demo_model_id_list,
             seeds=seed_list,
             dfes=dfe_list,
             annots=annotation_list,
-            chrms=chrm_list, 
-            ids=[0,1,2]
+            ids=pids,
         ),
-        polydfe_res = expand(output_dir + "/inference/{demog}/polyDFE/{dfes}/{annots}/{seeds}/{chrms}/pop{ids}/pop{ids}.polyDFE.bestfit",
+        polydfe_res = expand(output_dir + "/inference/{demog}/polyDFE/{dfes}/{annots}/{seeds}/pop{ids}/pop{ids}.polyDFE.bestfit",
             demog=demo_model_id_list,
             seeds=seed_list,
             dfes=dfe_list,
             annots=annotation_list,
-            chrms=chrm_list,
-            ids=[0,1,2]
+            ids=pids,
         ),
-        dfe_alpha_res = expand(output_dir + "/inference/{demog}/DFE-alpha/{dfes}/{annots}/{seeds}/{chrms}/pop{ids}/pop{ids}.DFE-alpha.bestfit",
+        dfe_alpha_res = expand(output_dir + "/inference/{demog}/DFE-alpha/{dfes}/{annots}/{seeds}/pop{ids}/pop{ids}.DFE-alpha.bestfit",
             demog=demo_model_id_list,
             seeds=seed_list,
             dfes=dfe_list,
             annots=annotation_list,
-            chrms=chrm_list,
-            ids=[0,1,2]
+            ids=pids,
         ),
-        grapes_res = expand(output_dir + "/inference/{demog}/grapes/{dfes}/{annots}/{seeds}/{chrms}/pop{ids}/pop{ids}.grapes.bestfit",
+        grapes_res = expand(output_dir + "/inference/{demog}/grapes/{dfes}/{annots}/{seeds}/pop{ids}/pop{ids}.grapes.bestfit",
             demog=demo_model_id_list,
             seeds=seed_list,
             dfes=dfe_list,
             annots=annotation_list,
-            chrms=chrm_list,
-            ids=[0,1,2]
+            ids=pids,
         )
     output:
-        output_dir + "/plots/{demog}/{chrms}/{dfes}/{annots}/dfe.inference.benchmark.pdf"
+        output_dir + "/plots/{demog}/{dfes}/{annots}/dfe.inference.benchmark.pdf"
     run:
-        contig = species.get_contig(wildcards.chrms)
-        seq_len = contig.recombination_map.sequence_length
+        # calc seq_len for dadi
+        seq_len = 0
+        for chrm in chrm_list:	    
+            if (wildcards.annots != "all_sites") and (wildcards.annots != "none"):
+                annotations = species.get_annotations(wildcards.annots)
+                annot_intervals = annotations.get_chromosome_annotations(chrm)
+                fp = os.path.join(output_dir, "simulated_data", wildcards.demog, wildcards.dfes, wildcards.annots, str(seed_list[0]), "sim_"+chrm+".trees")
+                ts = tskit.load(fp)
+                ts = ts.keep_intervals(annot_intervals)
+                exon_len = np.sum(annot_intervals[:,1]-annot_intervals[:,0])
+                seq_len += exon_len
+            else:
+                contig = species.get_contig(chrm)
+                seq_len += contig.recombination_map.sequence_length
 
         dadi_bestfits = [ b for b in input.dadi_res if wildcards.demog in b]
         polydfe_bestfits = [ b for b in input.polydfe_res if wildcards.demog in b]

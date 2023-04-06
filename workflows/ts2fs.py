@@ -1,23 +1,20 @@
 import dadi
 import numpy as np
 import tskit
+import masks
 
-
-def _generate_fs_from_ts(ts, sample_sets=None):
+def _generate_fs_from_ts(ts_dict, pop_idx, mask_file, annot, species, max_haplos):
     """
     Description:
         Converts tree sequences into 1d site frequency spectra.
 
     Arguments:
-        ts tskit.TreeSequence: A tree sequence.
-        sample_sets numpy.ndarray: A sample list.
+        ts_list dict: Dictionary of filepaths to tree sequences (values) for each chrm (key).
+        pop_idx int: Population ID within the tree sequences.
 
     Returns:
-        mut_afs numpy.ndarray: Frequency spectra for different types of mutations from the tree sequence.
+        mut_afs numpy.ndarray: Frequency spectra for different types of mutations, summed over chrms.
     """
-    if sample_sets is None:
-        sample_sets = [ts.samples()]
-
     def allele_counts(ts, sample_sets):
         """
         """
@@ -27,43 +24,70 @@ def _generate_fs_from_ts(ts, sample_sets=None):
         return ts.sample_count_stat(sample_sets, f, len(sample_sets),
                                     span_normalise=False, windows='sites',
                                     polarised=True, mode='site', strict=False)
+    
+    mut_afs = {"neutral":[], "non_neutral":[]}
+    seq_len = 0
+    for chrm in ts_dict:
+        ts = tskit.load(ts_dict[chrm])
+        sample_sets = ts.samples(population=pop_idx)
+        if max_haplos:
+            sample_sets = sample_sets[:max_haplos]
 
-    # Mapping mutation type IDs to class of mutation (e.g., neutral, non-neutral)
-    mut_types = {}
-    for dfe in ts.metadata["stdpopsim"]["DFEs"]:
-        for mt in dfe["mutation_types"]:
-            mid = mt["slim_mutation_type_id"]
-            if not mid in mut_types:
-                mut_types[mid] = "neutral" if mt["is_neutral"] else "non_neutral"
+        # apply masks
+        if mask_file is not None:
+            mask_intervals = masks.get_mask_from_file_dfe(mask_file, chrm)
+            ts = ts.delete_intervals(mask_intervals)
 
-    # print("These are the mutation types", flush=True)
-    # print(mut_types, flush=True)
+        # grab coding regions
+        if (annot != "all_sites") and (annot != "none"):
+            annotations = species.get_annotations(annot)
+            annot_intervals = annotations.get_chromosome_annotations(chrm)
+            ts = ts.keep_intervals(annot_intervals)
+            exon_len = np.sum(annot_intervals[:,1]-annot_intervals[:,0])
+            seq_len += exon_len
+        else:
+            contig = species.get_contig(chrm)
+            seq_len += contig.recombination_map.sequence_length
 
-    site_class = np.empty(ts.num_sites, dtype=object)
-    for j, s in enumerate(ts.sites()):
-        mt = []
-        for m in s.mutations:
-            for md in m.metadata["mutation_list"]:
-                mt.append(md["mutation_type"])
-        site_class[j] = mut_types[mt[0]] if len(mt) == 1 else "double_hit"
-    assert sum(site_class == None) == 0
-    # print("Number of sites per class is:", flush=True)
-    unique, counts = np.unique(site_class, return_counts=True)
-    # print(dict(zip(unique, counts)), flush=True)
+        # Mapping mutation type IDs to class of mutation (e.g., neutral, non-neutral)
+        mut_types = {}
+        for dfe in ts.metadata["stdpopsim"]["DFEs"]:
+            for mt in dfe["mutation_types"]:
+                mid = mt["slim_mutation_type_id"]
+                if not mid in mut_types:
+                    mut_types[mid] = "neutral" if mt["is_neutral"] else "non_neutral"
 
-    # currently this is only working on single popn SFS
-    freqs = allele_counts(ts, [sample_sets])
-    freqs = freqs.flatten().astype(int)
-    mut_classes = set(mut_types.values())
-    # Feeding a dictionary with afs for each mutation type
-    mut_afs = {}
-    for mc in mut_classes:
-        mut_afs[mc] = np.bincount(freqs[site_class == mc], minlength=len(sample_sets) + 1)
+        site_class = np.empty(ts.num_sites, dtype=object)
+        for j, s in enumerate(ts.sites()):
+            mt = []
+            for m in s.mutations:
+                for md in m.metadata["mutation_list"]:
+                    mt.append(md["mutation_type"])
+            site_class[j] = mut_types[mt[0]] if len(mt) == 1 else "double_hit"
+        assert sum(site_class == None) == 0
+        # print("Number of sites per class is:", flush=True)
+        unique, counts = np.unique(site_class, return_counts=True)
+        # print(dict(zip(unique, counts)), flush=True)
 
-    return mut_afs
+        # currently this is only working on single popn SFS
+        freqs = allele_counts(ts, [sample_sets])
+        freqs = freqs.flatten().astype(int)
+        mut_classes = set(mut_types.values())
+
+        # Feeding a dictionary with afs for each mutation type
+        for mc in mut_classes:
+            mut_afs[mc].append(np.bincount(freqs[site_class == mc], minlength=len(sample_sets) + 1))
+
+    # sum over chrms
+    mut_afs["neutral"] = np.array(mut_afs["neutral"])
+    mut_afs["non_neutral"] = np.array(mut_afs["non_neutral"])
+    mut_afs["neutral"] = np.sum(mut_afs["neutral"], axis=0)
+    mut_afs["non_neutral"] = np.sum(mut_afs["non_neutral"], axis=0)
+
+    return mut_afs,seq_len,len(sample_sets)
 
 
-def generate_fs(ts, sample_sets, output, format, coding_intervals=None, mask_intervals=None, is_folded=False, **kwargs):
+def generate_fs(ts_dict, pop_idx, mask_file, annot, species, output, format, max_haplos=None, seq_len=None, is_folded=False, **kwargs):
     """
     Description:
         Generates 1d site frequency spectra from tree sequences.
@@ -78,16 +102,7 @@ def generate_fs(ts, sample_sets, output, format, coding_intervals=None, mask_int
         is_folded bool: True, generates an unfolded frequency spectrum; False, generates a folded frequency spectrum.
         kwargs dict: Parameters for different DFE inference tools.
     """
-    # If just a single sample set is provided, we need to wrap it
-    # in a list to make it a list of sample setS
-    #if not isinstance(sample_sets, list):
-    #    sample_sets = [sample_sets]
-    if coding_intervals is not None:
-        ts = ts.keep_intervals(coding_intervals)
-    if mask_intervals is not None:
-        ts = ts.delete_intervals(mask_intervals)
-
-    mut_afs = _generate_fs_from_ts(ts, sample_sets)
+    mut_afs,seq_len,sample_size = _generate_fs_from_ts(ts_dict, pop_idx, mask_file, annot, species, max_haplos)
     neu_fs = mut_afs["neutral"]
     nonneu_fs = mut_afs["non_neutral"]
 
@@ -98,9 +113,10 @@ def generate_fs(ts, sample_sets, output, format, coding_intervals=None, mask_int
         nonneu_fs = _fold_fs(nonneu_fs)
 
     if format == 'dadi': _generate_dadi_fs(neu_fs, nonneu_fs, output)
-    elif format == 'polyDFE': _generate_polydfe_fs(neu_fs, nonneu_fs, output, **kwargs)
+    elif format == 'polyDFE': _generate_polydfe_fs(neu_fs, nonneu_fs, output, seq_len, sample_size, **kwargs)
     elif format == 'DFE-alpha': _generate_dfe_alpha_fs(neu_fs, nonneu_fs, output, is_folded, **kwargs)
-    elif format == 'grapes': _generate_grapes_fs(neu_fs, nonneu_fs, output, is_folded, **kwargs)
+    elif format == 'grapes': _generate_grapes_fs(neu_fs, nonneu_fs, output, is_folded, seq_len, sample_size, **kwargs)
+
     else: raise Exception(f'{format} is not supported!')
 
 
@@ -140,7 +156,7 @@ def _generate_dadi_fs(neu_fs, nonneu_fs, output):
     nonneu_fs.to_file(output[1])
 
 
-def _generate_polydfe_fs(neu_fs, nonneu_fs, output, **kwargs):
+def _generate_polydfe_fs(neu_fs, nonneu_fs, output, seq_len, sample_size, **kwargs):
     """
     Description:
         Outputs frequency spectra for polyDFE.
@@ -149,18 +165,17 @@ def _generate_polydfe_fs(neu_fs, nonneu_fs, output, **kwargs):
         neu_fs numpy.ndarray: Frequency spectrum for neutral mutations.
         nonneu_fs numpy.ndarray: Frequency spectrum for non-neutral mutations.
         output list: Names of output files.
-    
-    Keyword Arguments:
-        sample_size int: Number of haplotypes.
         seq_len int: Length of the genomic sequence generates mutations.
+        sample_size int: Number of haplotypes.
+    Keyword Arguments:
         neu_prop float: Proportion of neutral mutations.
         nonneu_prop float: Proportion of non-neutral mutations
     """
-    neu_len = round(kwargs['seq_len'] * kwargs['neu_prop'])
-    nonneu_len = round(kwargs['seq_len'] * kwargs['nonneu_prop'])
+    neu_len = round(seq_len * kwargs['neu_prop'])
+    nonneu_len = round(seq_len * kwargs['nonneu_prop'])
 
     with open(output[0], 'w') as o:
-        o.write(f"1 1 {kwargs['sample_size']}\n")
+        o.write(f"1 1 {sample_size}\n")
         o.write(" ".join([str(round(f)) for f in neu_fs[1:-1]]) + " " + str(neu_len) + "\n")
         o.write(" ".join([str(round(f)) for f in nonneu_fs[1:-1]]) + " " + str(nonneu_len) + "\n")
 
@@ -252,7 +267,7 @@ def _generate_dfe_alpha_fs(neu_fs, nonneu_fs, output, is_folded, **kwargs):
         o.write(" ".join([str(round(f)) for f in neu_fs]) + "\n")
 
 
-def _generate_grapes_fs(neu_fs, nonneu_fs, output, is_folded, **kwargs):
+def _generate_grapes_fs(neu_fs, nonneu_fs, output, is_folded, seq_len, sample_size, **kwargs):
     """
     Description:
         Outputs frequency spectra for grapes.
@@ -262,23 +277,23 @@ def _generate_grapes_fs(neu_fs, nonneu_fs, output, is_folded, **kwargs):
         nonneu_fs numpy.ndarray: Frequency spectrum for non-neutral mutations.
         output list: Names of output files.
         is_folded bool: True, generates a folded frequency spectrum; False, generates an unfolded frequency spectrum.
+        seq_len int: Length of the genomic sequence generates mutations.
+        sample_size int: Number of haplotypes.
 
     Keyword Arguments (Details in https://github.com/BioPP/grapes/blob/master/README.md):
         header str: A header.
         data_description str: Description for the data.
-        sample_size int: Number of haplotypes.
-        seq_len int: Length of the genomic sequence generates mutations.
         neu_prop float: Proportion of neutral mutations.
         nonneu_prop float: Proportion of non-neutral mutations
     """
-    neu_len = round(kwargs['seq_len'] * kwargs['neu_prop'])
-    nonneu_len = round(kwargs['seq_len'] * kwargs['nonneu_prop'])
+    neu_len = round(seq_len * kwargs['neu_prop'])
+    nonneu_len = round(seq_len * kwargs['nonneu_prop'])
 
     with open(output[0], 'w') as o:
         o.write(kwargs['header']+"\n")
         if is_folded is not True: o.write("#unfolded\n")
         o.write(kwargs['data_description']+"\t")
-        o.write(str(kwargs['sample_size'])+"\t")
+        o.write(str(sample_size)+"\t")
         o.write(str(nonneu_len)+"\t")
         o.write("\t".join([str(f) for f in nonneu_fs[1:-1]])+"\t")
         o.write(str(neu_len)+"\t")
