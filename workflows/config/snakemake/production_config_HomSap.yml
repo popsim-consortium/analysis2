@@ -9,9 +9,6 @@
     {"id":"Constant", 
     "num_samples_per_population": [100],
     },
-    {"id":"OutOfAfrica_3G09",
-    "num_samples_per_population": 3*[100], # shared 'n'; order of pops unclear
-    }
     {"id":"OutOfAfricaArchaicAdmixture_5R19",
     "num_samples_per_population": 3*[100],
     }
