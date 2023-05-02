@@ -278,7 +278,8 @@ def plot_all_dfe_results(input, output, mu, seq_len, nonneu_prop, pop_names=None
 
     grapes_shapes = [grapes_bestfits[i]['shape']
                      for i in range(len(grapes_bestfits))]
-    grapes_Es = [grapes_bestfits[i]['Es'] for i in range(len(grapes_bestfits))]
+    grapes_Ne = [grapes_bestfits[i]['theta'] / (4*mu) for i in range(len(grapes_bestfits))]
+    grapes_Es = [grapes_bestfits[i]['Es']/grapes_Ne[i] for i in range(len(grapes_bestfits))]
 
     fig = plt.figure(figsize=(6, 6), dpi=300)
 
