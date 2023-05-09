@@ -271,11 +271,13 @@ def plot_all_dfe_results(input, output, mu, seq_len, nonneu_prop, pop_names=None
     polydfe_Es = [2*abs(mu*polydfe_bestfits[i]['S_d']/polydfe_bestfits[i]
                         ['theta_bar']) for i in range(len(polydfe_bestfits))]
 
+    # Per https://doi.org/10.1534/genetics.107.080663 under Model
+    # DFE alpha assumes genotype fitnesses are 1, 1-s/2, 1-s, so like SLiM
     dfe_alpha_shapes = [dfe_alpha_bestfits[i]['b']
                         for i in range(len(dfe_alpha_bestfits))]
-    dfe_alpha_Es = [2*abs(dfe_alpha_bestfits[i]['Es'])
+    dfe_alpha_Es = [abs(dfe_alpha_bestfits[i]['Es'])
                     for i in range(len(dfe_alpha_bestfits))]
-
+    
     grapes_shapes = [grapes_bestfits[i]['shape']
                      for i in range(len(grapes_bestfits))]
     grapes_Ne = [grapes_bestfits[i]['theta'] / (4*mu) for i in range(len(grapes_bestfits))]
