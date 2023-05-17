@@ -1,0 +1,161 @@
+
+"""
+Snakefile module for training, and eventually running,
+a diploSHIC classifier on stdpopsim simulations.
+
+"""
+
+import pathlib
+import sys
+import numpy as np
+import yaml
+
+seed = 12345
+np.random.seed(seed)
+
+# change to the correct locations of discoal and diploSHIC
+discoal_exec = "ext/discoal/discoal"
+diploSHIC_exec = "diploSHIC"
+
+#some parameters that live in a .yaml file
+with open('workflows/diploshic_params.yaml') as file:
+      params = yaml.load(file, Loader=yaml.FullLoader)
+trainSampleNumber = params['trainSampleNumber'] #the number of simulation replicates we want to generate for each file in our training set
+testSampleNumber = params['testSampleNumber'] #the number of simulations to create for each file in the test set
+sampleSize = params['sampleSize'] #the number of individuals in our population sample
+numSites = params['numSites'] #total number of sites in our simulated window (i.e. S/HIC's subwindow size * 11)
+u = params['u'] #per-site mutation rate (used to calculate mean theta)
+gensPerYear = params['gensPerYear'] #number of generations per year
+maxSoftSweepInitFreq = params['maxSoftSweepInitFreq'] #maximum initial selected frequency for soft sweeps
+tauHigh = params['tauHigh'] #maximum FIXATION (not mutation) time (in units of 4N generations ago) in the past
+rhoOverTheta = params['rhoOverTheta'] #crossover rate over mut rate (used to calculate mean rho)
+ne0=params['ne0'] #effective population size at present
+N0 = ne0
+thetaMean=4*N0*float(u)*numSites
+rhoMean = thetaMean * rhoOverTheta
+thetaLow = (2*thetaMean)/11.0
+thetaHigh = 10*thetaLow
+rhoMax = 3 * rhoMean
+
+totSimRuns = params['totSimRuns'] #total number of simulations to run (i.e. trainSampleNumber + testSampleNumber)
+
+neutString = f"{discoal_exec} {sampleSize} {testSampleNumber} {numSites} -Pt {thetaLow} {thetaHigh} -Pre {rhoMean} {rhoMax} "
+alphaHigh = 2*N0*params['seln_coeff_max'] 
+alphaLow = 2*N0*params['seln_coeff_min'] 
+selString = f"{discoal_exec} {sampleSize} {trainSampleNumber} {numSites} -Pt {thetaLow} {thetaHigh} -Pre {rhoMean} {rhoMax} "
+selStr = selString + " -ws 0 -Pa %f %f -Pu 0 %f" %(alphaLow, alphaHigh, tauHigh)
+
+# partialSelStr = " -ws 0 -Pa %f %f" %(alphaLow, alphaHigh)
+softStr = " -Pf 0 %f" %(maxSoftSweepInitFreq)
+
+# create array of locations to simulate sweeps
+# at centers of subwindows
+tmp_locs = np.linspace(0,1,12,endpoint=True)
+sweep_locs = (tmp_locs + np.roll(tmp_locs,-1)) / 2
+sweep_locs = sweep_locs[:-1]
+
+
+rule all:
+    input:
+        discoal_exec,
+        expand("{tDir}/discoal.{mod}.{x}.{i}.out.fvec", mod = ["neut", "hard", "soft"], tDir = ["train", "test"], x = range(11), i = range(totSimRuns)),
+        expand("{tDir}/{mod}_{x}.fvec", mod = ["hard", "soft"], tDir = ["train", "test"], x = range(11)),
+        expand("{tDir}/neut_0.fvec", tDir = ["train", "test"]),
+        expand("trainingSets/{cl}.fvec", cl = ["hard", "linkedHard", "soft", "linkedSoft", "neut"]),
+        "trained_model.json",
+        "trained_model.weights.hdf5"
+
+rule clone_discoal:
+    output:
+        "ext/discoal/discoal"
+    message: "Cloning discoal"
+    threads: 1
+    shell:
+        """
+        cd ext/
+        git clone https://github.com/kr-colab/discoal.git
+        cd discoal/
+        make discoal
+        cd ..
+        """
+
+rule discoal_neutral_simulation:
+    message: "simulation stage"
+    input:
+        discoal_exec
+    output:
+        "{tDir}/discoal.neut.{i}.out"
+    shell:
+        neutString + " > {output}"
+
+
+rule discoal_hard_simulation:
+    message: "hard simulation stage"
+    input:
+        discoal_exec
+    output:
+        "{tDir}/discoal.hard.{x}.{i}.out"
+    run:
+        cmd = selStr + " -x "+str(sweep_locs[int(wildcards.x)])+" > {output}"
+        shell(cmd)
+
+rule discoal_soft_simulation:
+    message: "soft simulation stage"
+    input:
+        discoal_exec
+    output:
+        "{tDir}/discoal.soft.{x}.{i}.out"
+    run:
+        cmd = selStr + softStr + " -x "+str(sweep_locs[int(wildcards.x)])+" > {output}"
+        shell(cmd)
+
+rule calc_sim_fvs:
+    input:
+        "{tDir}/discoal.{mod}.{x}.{i}.out"
+    output:
+        "{tDir}/discoal.{mod}.{x}.{i}.out.fvec"
+    run:
+        cmd = f"{diploSHIC_exec} fvecSim haploid {input} {output} --totalPhysLen={numSites} --maskFileName none --chrArmsForMasking none"
+        shell(cmd)
+
+rule concat_fvecs:
+    input:
+        expand("{tDir}/discoal.{mod}.{x}.{i}.out.fvec", mod = ["neut", "hard", "soft"], tDir = ["train", "test"], x = range(11), i = range(totSimRuns))
+    output:
+        expand("{tDir}/{mod}_{x}.fvec", tDir = ["train", "test"], mod = ["hard", "soft"], x = range(11)),
+        expand("{tDir}/neut_0.fvec", tDir = ["train", "test"])
+    run:
+        for t in ["train", "test"]:
+            cmd = "cat {t}/discoal.neut.0.0.out.fvec > {t}/neut_0.fvec"
+            for ii in range(1, totSimRuns):
+                cmd += f" && tail -n +2 {t}/discoal.neut.0.{ii}.out.fvec >> {t}/neut_0.fvec"
+            for model in ["hard", "soft"]:
+                for xx in range(11):
+                    cmd += f" && cat {t}/discoal.{model}.{xx}.0.out.fvec > {t}/{model}_{xx}.fvec"
+                    for i in range(1,totSimRuns):
+                        cmd += f" && tail -n +2 {t}/discoal.{model}.{xx}.{ii}.out.fvec >> {t}/{model}_{xx}.fvec"
+            shell(cmd)
+
+rule make_training_sets:
+    input:
+        rules.concat_fvecs.output
+    output:
+        expand("trainingSets/{cl}.fvec", cl = ["hard", "linkedHard", "soft", "linkedSoft", "neut"])
+    run:
+        cmd = f"{diploSHIC_exec} makeTrainingSets train/neut_0.fvec train/soft train/hard 5 0,1,2,3,4,6,7,8,9,10 trainingSets/"
+        shell(cmd)
+
+rule train_classifier:
+    input:
+        rules.make_training_sets.output
+    output:
+        "trained_model.json",
+        "trained_model.weights.hdf5"
+    run:
+        cmd = f"{diploSHIC_exec} train trainingSets/ trainingSets/ trained_model --epochs=10"
+        shell(cmd)
+
+rule clean:
+    shell:
+        "rm -rf test/ train/ trained_model* \
+            .snakemake slurm*"
