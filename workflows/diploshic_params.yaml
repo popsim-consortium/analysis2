@@ -2,12 +2,12 @@
 trainSampleNumber: 10 #the number of simulation replicates we want to generate for each file in our training set
 testSampleNumber: 10 #the number of simulations to create for each file in the test set
 sampleSize: 10 #the number of individuals in our population sample
-numSites: 55000 #total number of sites in our simulated window (i.e. S/HIC's subwindow size * 11)
+numSites: 100_000 #total number of sites in our simulated window (i.e. S/HIC's subwindow size * 11)
 u: 3.27e-9 #per-site mutation rate (used to calculate mean theta)
 gensPerYear: 10.0 #number of generations per year
 maxSoftSweepInitFreq: 0.1 #maximum initial selected frequency for soft sweeps
 tauHigh: 0.05 #maximum FIXATION (not mutation) time (in units of 4N generations ago) in the past
-rhoOverTheta: 5.0 #crossover rate over mut rate (used to calculate mean rho)
+rhoOverTheta: 1.0 #crossover rate over mut rate (used to calculate mean rho)
 
 ne0: 100_000
 thetaMean: 4*N0*u*numSites
