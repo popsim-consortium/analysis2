@@ -12,8 +12,6 @@ import yaml
 
 seed = 12345
 np.random.seed(seed)
-replicates = 2
-seed_array = np.random.random_integers(1,2**31,replicates)
 
 # change to the correct locations of discoal and diploSHIC
 discoal_exec = "ext/discoal/discoal"
@@ -42,7 +40,6 @@ rhoMax = 3 * rhoMean
 totSimRuns = params['totSimRuns'] #total number of simulations to run (i.e. trainSampleNumber + testSampleNumber)
 
 neutString = f"{discoal_exec} {sampleSize} {testSampleNumber} {numSites} -Pt {thetaLow} {thetaHigh} -Pre {rhoMean} {rhoMax} "
-# TODO add demography string to the neutral string above
 alphaHigh = 2*N0*params['seln_coeff_max'] 
 alphaLow = 2*N0*params['seln_coeff_min'] 
 selString = f"{discoal_exec} {sampleSize} {trainSampleNumber} {numSites} -Pt {thetaLow} {thetaHigh} -Pre {rhoMean} {rhoMax} "
