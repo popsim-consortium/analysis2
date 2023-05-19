@@ -159,7 +159,7 @@ def add_window_metadata(ts, window_left, window_right, window_bleft, window_brig
     """
     Add information on window and buffer to the tree sequence metadata. 
     "bleft" and "bright" are for buffer, "left" and "right" are for focal window.
-    Positions are measured relative to "bleft".
+    Positions are measured relative to "bleft".a
     """
     if extra is None:
         extra = ""
@@ -167,8 +167,7 @@ def add_window_metadata(ts, window_left, window_right, window_bleft, window_brig
     metadata = tables.metadata
     new_metadata = {
         "windowing":
-            {
-                "window_left": window_left,
+            {"window_left": window_left,
                 "window_bleft": window_bleft,
                 "window_right": window_right,
                 "window_bright": window_bright,
@@ -397,8 +396,22 @@ def dump_results(input, output, params_dict, target_pops, num_subwins=1):
             for j in range(len(target_pops)):
                 print(f'{meta_str}\t{target_pops[j]}\t{windows[i,0]:.0f}\t{windows[i,1]:.0f}\t{statname}\t{stats[i,j]:.4e}', file=fh, flush=True)
     
-    # Computing tsstats diversity
+    # Outputting VCF
+    fh_vcf = open(output[1], 'w')
     sample_sets = [ts.samples(population=all_pops_in_ts.index(pop)) for pop in target_pops]
+    tss = ts.simplify(np.array(sample_sets).squeeze())
+    # Removing the buffer region
+    w_dict = ts.metadata["windowing"]
+    del_intervals = []
+    if w_dict["window_bleft"] != w_dict["window_left"]:
+        del_intervals.append([0,w_dict["window_left"]-w_dict["window_bleft"]])
+    if w_dict["window_right"] != w_dict["window_bright"]:
+        del_intervals.append([w_dict["window_right"]-w_dict["window_bleft"], ts.sequence_length])
+    if len(del_intervals) > 0:
+        tss = tss.delete_intervals(del_intervals)
+        tss = tss.trim()
+    tss.write_vcf(fh_vcf)
+    # Computing tsstats diversity
     divs, windows = compute_stats(ts, sample_sets, num_subwins=num_subwins)
     assert divs.shape == (num_subwins,len(target_pops))
     assert windows.shape == (num_subwins,2)
@@ -448,11 +461,12 @@ sw_outs_prefix = [output_dir +  f"/simulated_data/sweeps/sweep/{demo_model['id']
 
 trees_outs = [file_prefix+".trees" for file_prefix in neutral_outs_prefix + bgs_outs_prefix + sw_outs_prefix]
 stats_outs = [file_prefix+".stats.tsv" for file_prefix in neutral_outs_prefix + bgs_outs_prefix + sw_outs_prefix]
+vcf_outs = [file_prefix+".vcf" for file_prefix in neutral_outs_prefix + bgs_outs_prefix + sw_outs_prefix]
 annot_outs = [output_dir + f'/simulated_data/sweeps/annot_overlap_{annot}_{chrom}_{config["num_windows"]}.tsv' for annot in annotation_list]
 
 rule all:
     input:
-        boundary_outs + trees_outs + stats_outs + [output_dir + f'/simulated_data/sweeps/all_sims.stats.tsv', output_dir+f'/simulated_data/sweeps/rec_map_{chrom}_{config["num_windows"]}.tsv'] + annot_outs
+        boundary_outs + trees_outs + stats_outs + vcf_outs + [output_dir + f'/simulated_data/sweeps/all_sims.stats.tsv', output_dir+f'/simulated_data/sweeps/rec_map_{chrom}_{config["num_windows"]}.tsv'] + annot_outs
 
 rule write_rec:
     input:
@@ -632,6 +646,7 @@ rule get_stats:
     input: output_dir + '/simulated_data/sweeps/{middle}/sim_{chrom}_{left}_{right}.trees'
     output:
         output_dir + "/simulated_data/sweeps/{middle}/sim_{chrom}_{left}_{right}.stats.tsv", 
+        output_dir + "/simulated_data/sweeps/{middle}/sim_{chrom}_{left}_{right}.vcf"
     resources: time=3000, mem_mb=2000
     run:
         target_pops = None
