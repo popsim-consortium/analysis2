@@ -2,6 +2,7 @@ name: analysis2
 channels:
   - conda-forge
   - bioconda
+  - r
 dependencies:
   - gcc
   - gmp
@@ -28,6 +29,12 @@ dependencies:
   - mamba
   - openjdk
   - sweepfinder2
+  - scikit-learn
+  - r-base
+  - r-essentials
+  - r-irkernel
+  - r-ggplot2
+  - r-dplyr
   - pip:
     - git+https://github.com/popsim-consortium/stdpopsim.git
     - scikit-allel
