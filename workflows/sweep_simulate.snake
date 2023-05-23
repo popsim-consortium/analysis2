@@ -11,8 +11,8 @@ import math
 import subprocess
 from scipy.optimize import root_scalar
 
-configfile: "workflows/config/snakemake/sweep_config.yaml"
-#configfile: "workflows/config/snakemake/small_sweep.yaml"
+#configfile: "workflows/config/snakemake/sweep_config.yaml"
+configfile: "workflows/config/snakemake/small_sweep.yaml"
 
 rng = np.random.default_rng(seed=config["seed"])
 rng2 = np.random.default_rng(seed=config["seed"]+1)
@@ -399,7 +399,7 @@ def dump_results(input, output, params_dict, target_pops, num_subwins=1):
     # Outputting VCF
     fh_vcf = open(output[1], 'w')
     sample_sets = [ts.samples(population=all_pops_in_ts.index(pop)) for pop in target_pops]
-    tss = ts.simplify(np.array(sample_sets).squeeze())
+    tss = ts.simplify(np.array(sample_sets).flatten())
     # Removing the buffer region
     w_dict = ts.metadata["windowing"]
     del_intervals = []
