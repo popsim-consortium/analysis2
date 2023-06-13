@@ -271,11 +271,23 @@ def plot_all_dfe_results(input, output, mu, seq_len, nonneu_prop, pop_names=None
     polydfe_Es = [2*abs(mu*polydfe_bestfits[i]['S_d']/polydfe_bestfits[i]
                         ['theta_bar']) for i in range(len(polydfe_bestfits))]
 
+    # Per https://doi.org/10.1534/genetics.107.080663 under Model
+    # DFE alpha assumes genotype fitnesses are 1, 1-s/2, 1-s, so like SLiM
     dfe_alpha_shapes = [dfe_alpha_bestfits[i]['b']
                         for i in range(len(dfe_alpha_bestfits))]
-    dfe_alpha_Es = [2*abs(dfe_alpha_bestfits[i]['Es'])
+    dfe_alpha_Es = [abs(dfe_alpha_bestfits[i]['Es'])
                     for i in range(len(dfe_alpha_bestfits))]
-
+    
+    # Per https://github.com/BioPP/grapes/blob/master/README.md,
+    #   GRAPES implements the model of DFE alpha, so we expect genotype fitnesses 1, 1-s/2, and 1-s.
+    # Equation 4 in https://doi.org/10.1371/journal.pgen.1005774 is consistent with this formulation.
+    # Based on the scale of the output, Es reported must be a population-scaled value.
+    # Note that comments in the source code: https://github.com/BioPP/grapes/blob/master/grapes/Grapes.cpp
+    #   Line 109 implies theta = 4 Ne mu, whereas line 1208 suggests 2 Ne mu.
+    # But executable code at line 746 suggests it is 4 Ne mu.
+    # According to https://doi.org/10.1371/journal.pgen.1005774 and http://doi.org/10.1534/genetics.120.303622,
+    #   The population-scaled mutation rate is defined by 4 Ne s.
+    # But we get agreement between simulated and inferred values assuming that Es output is Ne s.
     grapes_shapes = [grapes_bestfits[i]['shape']
                      for i in range(len(grapes_bestfits))]
     grapes_Ne = [grapes_bestfits[i]['theta'] / (4*mu) for i in range(len(grapes_bestfits))]
