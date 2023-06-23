@@ -12,8 +12,8 @@ genetic_map: HapMapII_GRCh38
 demo_model:
   id: OutOfAfrica_3G09
   samples: 
-    YRI: 1000
-    CEU: 1000
+    YRI: 10
+    CEU: 10
     CHB: 0
 
 # BGS configs
@@ -27,11 +27,14 @@ annotation_list:
 num_windows: 100 # number of sweep locations in chromosome
 focal_size: 5_000_000 # size of the focal sweep window in bp
 buffer_cM: 2.5
+num_subwins: 10 # number of subwindows within focal to compute statistic
+
 # Sweep configs
 coeffs: 
   bounds: [0.03, 0.1]
   grid_size: 1 # This will yield just one s=0.03 or 2Ns~600
 sweep_min_freq: 0.8
+time_multipliers: [1]
 
 # slim settings
 slim_scaling_factor: 2

@@ -57,6 +57,7 @@ windows = np.floor(windows)
 # Grid of selection coeffs
 coeffs_dict = config["coeffs"]
 sel_coeffs = np.linspace(*coeffs_dict["bounds"], coeffs_dict["grid_size"])
+time_mults = config["time_multipliers"]
 
 # Random seeds for main simulations, checks on boundary size
 seed_array = rng.integers(1,2**31,replicates)
@@ -78,12 +79,49 @@ region_size = config["region_size"]
 
 # -------------- Helper functions for making buffer around focal window ---------------
 
+
 def genetic_distance(ratemap, x, x0=0):
     """
     Function that returns the genetic distance (in cM) between positions x and 
     x0 based on a msprime.RateMap with recombination rates.
     """
     return 100*(ratemap.get_cumulative_mass(x) - ratemap.get_cumulative_mass(x0))
+
+
+def write_rec_rates(fname, ratemap, windows):
+    """
+    Function that writes a .tsv file with the recombination rates within the 
+    `windows`from a msprime.RateMap.
+    """
+    last = 0
+    fh = open(fname, 'w')
+    for start, end in windows:
+        cum_cM = ratemap.get_cumulative_mass(end)
+        print(f'{start}\t{end}\t{cum_cM}\t{cum_cM-last}', file=fh)
+        last = cum_cM
+    fh.close()
+
+def write_annot_density(fname, chrom, annot, windows):
+    annot_intervals = species.get_annotations(annot).get_chromosome_annotations(chrom)
+    ex_density = np.zeros(windows.shape[0])
+    for i, (start, end) in enumerate(windows):
+        for es, ee in annot_intervals:
+            if es > end:
+                break
+            # case where exon starts before window
+            if (es < start and ee >= start) :
+                # dealing with case where exon spans more than the entire window
+                tee = ee if ee < end else end
+                ex_density[i] += tee - start
+            elif es > start and es < end:
+                tee = ee if ee < end else end
+                ex_density[i] += tee - es
+    ex_density = ex_density / (windows[:,1] - windows[:,0])
+    fh = open(fname, 'w')
+    print('chr\tsim_left\tsim_right\toverlap\tannot', file=fh)
+    for ed, (start, end) in zip (ex_density, windows):
+        print(f'{chrom}\t{start}\t{end}\t{ed}\t{annot}', file=fh)
+    fh.close()
 
 
 def make_buffer(gmap, cM, left, right):
@@ -121,7 +159,7 @@ def add_window_metadata(ts, window_left, window_right, window_bleft, window_brig
     """
     Add information on window and buffer to the tree sequence metadata. 
     "bleft" and "bright" are for buffer, "left" and "right" are for focal window.
-    Positions are measured relative to "bleft".
+    Positions are measured relative to "bleft".a
     """
     if extra is None:
         extra = ""
@@ -129,8 +167,7 @@ def add_window_metadata(ts, window_left, window_right, window_bleft, window_brig
     metadata = tables.metadata
     new_metadata = {
         "windowing":
-            {
-                "window_left": window_left,
+            {"window_left": window_left,
                 "window_bleft": window_bleft,
                 "window_right": window_right,
                 "window_bright": window_bright,
@@ -162,17 +199,17 @@ def compute_clr(ts_path, recmap, model, samples, sample_sets):
         dump_sf2_spectrum_file(spec_path, model, samples, ss)
         dump_sf2_allele_frequency_file(freq_path, ts, ss)
         dump_sf2_recombination_rate_file(rate_path, recmap, ts)
-        dump_sf2_grid_file(grid_path, ts)
+        grid = dump_sf2_grid_file(grid_path, ts)
         args = [
             "SweepFinder2", "-lru", f"{grid_path}", f"{freq_path}", 
             f"{spec_path}", f"{rate_path}", f"{clr_path}",
         ]
         subprocess.run(args, stdout=subprocess.DEVNULL)
         clr = np.loadtxt(clr_path, skiprows=1)
-        # TODO: argmax CLR -- do we want to just use val from center of window instead?
-        # things get wierd on boundaries of grid if we only include SNPs in focal window
-        out.append(np.max(clr[:,1])) 
-    return np.array(out)
+        out.append(clr[:,1])
+    # windows for the CLR -- note that we are going from 1-based positions to [,) intervals
+    windows = np.array([grid, grid+1]).T
+    return np.array(out).T, windows
 
 
 def dump_sf2_spectrum_file(output_path, model, samples, sample_set, replicates=10000, seed=1024):
@@ -287,16 +324,17 @@ def dump_sf2_grid_file(output_path, ts, grid_size=21):
     offset = ts.metadata['windowing']['window_bleft']
     focal_left = ts.metadata['windowing']['window_left'] - offset
     focal_right = ts.metadata['windowing']['window_right'] - offset
-    grid = np.linspace(focal_left, focal_right, grid_size)
+    grid = np.linspace(focal_left, focal_right-1, grid_size) # -1 bc the right is not inclusive
     handle = open(output_path, "w")
     for pos in grid:
         handle.write(f"{int(pos)}\n")
     handle.close()
+    return grid+offset
 
 
 # ----------- Helper functions for summary statistics -----------
 
-def compute_stats(ts, sample_sets):
+def compute_stats(ts, sample_sets, num_subwins=1):
     """
     Calculate summary statistics for a window
 
@@ -307,29 +345,34 @@ def compute_stats(ts, sample_sets):
       easiest to do this w/ scikit-allel, using overlapping windows
     """
     offset = ts.metadata['windowing']['window_bleft']
-    windows_bpoints = np.array([
-        ts.metadata['windowing']['window_bleft']-offset,
-        ts.metadata['windowing']['window_left']-offset,
-        ts.metadata['windowing']['window_right']-offset,
-        ts.metadata['windowing']['window_bright']-offset
-    ], dtype=np.int32)
-
+    bleft = ts.metadata['windowing']['window_bleft']-offset
+    left = ts.metadata['windowing']['window_left']-offset
+    right = ts.metadata['windowing']['window_right']-offset
+    bright = ts.metadata['windowing']['window_bright']-offset
+    in_between_wins = np.linspace(left, right, num_subwins+1)
+    windows_bpoints = np.concatenate(([bleft],in_between_wins,[bright]))
     # removing duplicates if bleft/left or bright/right are the same
     windows_bpoints = np.unique(windows_bpoints)
     # something wonky happening with float conversion
-    if windows_bpoints[-1] == ts.sequence_length - 1:
-        windows_bpoints[-1] = ts.sequence_length
-    assert (windows_bpoints.shape == (2,)) or windows_bpoints.shape == (4,)
-
-    taj = ts.Tajimas_D(sample_sets=sample_sets, windows=windows_bpoints, mode="site")
-    focal_taj = taj[len(taj)//2, :] 
-
-    return focal_taj, taj
+    windows_bpoints[-1] = ts.sequence_length
+    div = ts.diversity(sample_sets=sample_sets, windows=windows_bpoints, mode="site")
+    windows = np.column_stack((windows_bpoints[:-1], windows_bpoints[1:]))
+    assert windows.shape[0] == div.shape[0]
+    # removing the buffer window
+    if bleft != left:
+        div = div[1:,]
+        windows = windows[1:,]
+    if bright != right:
+        div = div[:-1,]
+        windows = windows[:-1,]
+    windows = windows + offset # returning windows to original scale
+    # always include the last bpoints from the windows array
+    return div, windows
 
 
 # ------------ Wrapper to aggregate results --------------
 
-def dump_results(input, output, params_dict, target_pops):
+def dump_results(input, output, params_dict, target_pops, num_subwins=1):
     """
     Dump sweep various test statistics to file
     """
@@ -340,28 +383,43 @@ def dump_results(input, output, params_dict, target_pops):
     all_pops_in_ts = [pop.metadata['name'] for pop in ts.populations()]
     if target_pops is None:
         target_pops = pop_list
-    sample_sets = [ts.samples(population=all_pops_in_ts.index(pop)) for pop in target_pops]
-    stat_names = []
-    stats = np.empty((len(target_pops), 0))
-
-    focal_taj, _ = compute_stats(ts, sample_sets)
-    assert focal_taj.shape == (len(target_pops),)
-    stats = np.column_stack([stats, focal_taj])
-    stat_names += ['taj']
-
-    focal_clr = compute_clr(input[0], recmap, model, samples, sample_sets)
-    assert focal_clr.shape == (len(target_pops),)
-    stats = np.column_stack([stats, focal_clr])
-    stat_names += ['clr']
-
+    
+    # Printing the header
     fh = open(output[0], 'w')
-    meta = ["model", "demo", "seed", "chrom", "left", "right", "annot", "dfe", "coeff"]
-    header = "\t".join(meta + ['pop'] + stat_names)
+    meta = ["model", "demo", "seed", "chrom", "sim_left", "sim_right", "annot", "dfe", "coeff", "tmult"]
+    header = "\t".join(meta + ['pop','stat_left', 'stat_right', 'stat_name', 'stat_val'])
     meta_str = "\t".join([params_dict[m] for m in meta])
     print(f'{header}', file=fh, flush=True)
-    for s, p in zip(stats, target_pops):
-        s_str = "\t".join(['%.4e' % x for x in s])
-        print(f'{meta_str}\t{p}\t{s_str}', file=fh, flush=True)
+    def _print_stat_line(statname, stats, windows, target_pops, fh):
+        assert stats.shape == (windows.shape[0],len(target_pops))
+        for i in range(windows.shape[0]):
+            for j in range(len(target_pops)):
+                print(f'{meta_str}\t{target_pops[j]}\t{windows[i,0]:.0f}\t{windows[i,1]:.0f}\t{statname}\t{stats[i,j]:.4e}', file=fh, flush=True)
+    
+    # Outputting VCF
+    fh_vcf = open(output[1], 'w')
+    sample_sets = [ts.samples(population=all_pops_in_ts.index(pop)) for pop in target_pops]
+    tss = ts.simplify(np.array(sample_sets).flatten())
+    # Removing the buffer region
+    w_dict = ts.metadata["windowing"]
+    del_intervals = []
+    if w_dict["window_bleft"] != w_dict["window_left"]:
+        del_intervals.append([0,w_dict["window_left"]-w_dict["window_bleft"]])
+    if w_dict["window_right"] != w_dict["window_bright"]:
+        del_intervals.append([w_dict["window_right"]-w_dict["window_bleft"], ts.sequence_length])
+    if len(del_intervals) > 0:
+        tss = tss.delete_intervals(del_intervals)
+        tss = tss.trim()
+    tss.write_vcf(fh_vcf)
+    # Computing tsstats diversity
+    divs, windows = compute_stats(ts, sample_sets, num_subwins=num_subwins)
+    assert divs.shape == (num_subwins,len(target_pops))
+    assert windows.shape == (num_subwins,2)
+    _print_stat_line("div", divs, windows, target_pops, fh)
+
+    clrs, windows = compute_clr(input[0], recmap, model, samples, sample_sets)
+    _print_stat_line("clr", clrs, windows, target_pops, fh)
+
     fh.close()
 
 
@@ -385,33 +443,49 @@ bgs_outs_prefix = [output_dir + f"/simulated_data/sweeps/bgs/{demo_model['id']}/
     for annot in annotation_list
 ]
 
-sw_outs_prefix = [output_dir +  f"/simulated_data/sweeps/sweep/{demo_model['id']}/{popu}/{annot}/{dfe}/{coeff}/{seed}/sim_{chrom}_{left:.0f}_{right:.0f}"
+sw_outs_prefix = [output_dir +  f"/simulated_data/sweeps/sweep/{demo_model['id']}/{popu}/{annot}/{dfe}/{coeff}/{tmult}/{seed}/sim_{chrom}_{left:.0f}_{right:.0f}"
     for left, right in windows
     for seed in seed_array
     for dfe in dfe_list
     for annot in annotation_list
     for coeff in sel_coeffs
     for popu in pop_list
-] + [output_dir +  f"/simulated_data/sweeps/sweep/{demo_model['id']}/{popu}/NA/NA/{coeff}/{seed}/sim_{chrom}_{left:.0f}_{right:.0f}"
+    for tmult in time_mults
+] + [output_dir +  f"/simulated_data/sweeps/sweep/{demo_model['id']}/{popu}/NA/NA/{coeff}/{tmult}/{seed}/sim_{chrom}_{left:.0f}_{right:.0f}"
     for left, right in windows
     for seed in seed_array
     for coeff in sel_coeffs
     for popu in pop_list
+    for tmult in time_mults
 ]
 
 trees_outs = [file_prefix+".trees" for file_prefix in neutral_outs_prefix + bgs_outs_prefix + sw_outs_prefix]
 stats_outs = [file_prefix+".stats.tsv" for file_prefix in neutral_outs_prefix + bgs_outs_prefix + sw_outs_prefix]
+vcf_outs = [file_prefix+".vcf" for file_prefix in neutral_outs_prefix + bgs_outs_prefix + sw_outs_prefix]
+annot_outs = [output_dir + f'/simulated_data/sweeps/annot_overlap_{annot}_{chrom}_{config["num_windows"]}.tsv' for annot in annotation_list]
 
 rule all:
     input:
-        boundary_outs + trees_outs + stats_outs + [output_dir + f'/simulated_data/sweeps/all_sims.stats.tsv']
+        boundary_outs + trees_outs + stats_outs + vcf_outs + [output_dir + f'/simulated_data/sweeps/all_sims.stats.tsv', output_dir+f'/simulated_data/sweeps/rec_map_{chrom}_{config["num_windows"]}.tsv'] + annot_outs
 
+rule write_rec:
+    input:
+    output: output_dir + f'/simulated_data/sweeps/rec_map_{chrom}_{config["num_windows"]}.tsv'
+    run:
+        write_rec_rates(output[0], recmap, windows)
+
+rule write_annot:
+    input:
+    output: output_dir + f'/simulated_data/sweeps/annot_overlap_{{annot}}_{{chrom}}_{config["num_windows"]}.tsv'
+    run:
+        print(windows)
+        write_annot_density(output[0], wildcards.chrom, wildcards.annot, windows)
 
 rule boundary_sims:
     input:
     output:
         output_dir + "/simulated_data/sweeps/boundary_sims/sim_{seed}_{region_size}.trees"
-    resources: time=6000, mem_mb=16000
+    resources: time=6000, mem_mb=6000
     run:
         model = species.get_demographic_model(demo_model["id"])
         mut_rate = model.mutation_rate 
@@ -472,7 +546,7 @@ rule bgs:
     input:
     output:
         output_dir + f"/simulated_data/sweeps/bgs/{demo_model['id']}/{{annot}}/{{dfe}}/{{seed}}/sim_{chrom}_{{left}}_{{right}}.trees", 
-    resources: time=3000, mem_mb=4000
+    resources: time=3000, mem_mb=3000
     run:
         model = species.get_demographic_model(demo_model["id"])
         mutation_rate = model.mutation_rate
@@ -510,8 +584,8 @@ rule bgs:
 rule sweep:
     input:
     output:
-        output_dir + f"/simulated_data/sweeps/sweep/{demo_model['id']}/{{popu}}/{{annot}}/{{dfe}}/{{coeff}}/{{seed}}/sim_{{chrom}}_{{left}}_{{right}}.trees", 
-    resources: time=3000, mem_mb=4000
+        output_dir + f"/simulated_data/sweeps/sweep/{demo_model['id']}/{{popu}}/{{annot}}/{{dfe}}/{{coeff}}/{{tmult}}/{{seed}}/sim_{{chrom}}_{{left}}_{{right}}.trees", 
+    resources: time=3000, mem_mb=8000
     run:
         model = species.get_demographic_model(demo_model["id"])
         mutation_rate = model.mutation_rate
@@ -542,7 +616,7 @@ rule sweep:
         gamma = coal_T* coeff #2Ns
         # TODO: check this is not off by a factor of two
         T_f = 4 * (np.log(gamma) + 0.5772 - (1/gamma)) / coeff # this is from Charlesworth 2020/Pennings and Hermisson 2007
-        time = np.floor(1.5*T_f) # I dilated the time a bit because of variance (don't want to lose too many sims due to this -- note we are conditioning on sweep_min_freq)
+        time = np.floor(float(wildcards.tmult)*T_f) # I dilated the time a bit because of variance (don't want to lose too many sims due to this -- note we are conditioning on sweep_min_freq)
         print(coal_T, gamma, T_f, time)
         contig.add_single_site("sweep", coordinate=coord)
         extended_events = stdpopsim.ext.selective_sweep(
@@ -572,6 +646,7 @@ rule get_stats:
     input: output_dir + '/simulated_data/sweeps/{middle}/sim_{chrom}_{left}_{right}.trees'
     output:
         output_dir + "/simulated_data/sweeps/{middle}/sim_{chrom}_{left}_{right}.stats.tsv", 
+        output_dir + "/simulated_data/sweeps/{middle}/sim_{chrom}_{left}_{right}.vcf"
     resources: time=3000, mem_mb=2000
     run:
         target_pops = None
@@ -586,9 +661,10 @@ rule get_stats:
                         "annot":"NA",
                         "dfe":"NA",
                         "coeff":"NA",
+                        "tmult":"NA",
                         "chrom": wildcards.chrom,
-                        "left": wildcards.left,
-                        "right": wildcards.right
+                        "sim_left": wildcards.left,
+                        "sim_right": wildcards.right
                     }
         assert model in ["neutral", "bgs", "sweep"]
         if model == "bgs":
@@ -599,14 +675,15 @@ rule get_stats:
             params_dict["annot"] = params_list[3]
             params_dict["dfe"] = params_list[4]
             params_dict["coeff"] = params_list[5]
-        dump_results(input, output, params_dict, target_pops)
+            params_dict["tmult"] = params_list[6]
+        dump_results(input, output, params_dict, target_pops, config["num_subwins"])
 
 
 rule merge_stats:
     input: stats_outs
     output:
         output_dir + f'/simulated_data/sweeps/all_sims.stats.tsv'
-    resources: time=3000, mem_mb=16000, disk_mb=16000
+    resources: time=3000, mem_mb=48000, disk_mb=48000
     run:
         #print(input, flush=True)
         #import pdb; pdb.set_trace()
