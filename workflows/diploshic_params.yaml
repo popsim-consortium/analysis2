@@ -2,7 +2,7 @@
 trainSampleNumber: 10 #the number of simulation replicates we want to generate for each file in our training set
 testSampleNumber: 10 #the number of simulations to create for each file in the test set
 sampleSize: 10 #the number of individuals in our population sample
-numSites: 100_000 #total number of sites in our simulated window (i.e. S/HIC's subwindow size * 11)
+numSites: 110_000 #total number of sites in our simulated window (i.e. S/HIC's subwindow size * 11)
 u: 3.27e-9 #per-site mutation rate (used to calculate mean theta)
 gensPerYear: 10.0 #number of generations per year
 maxSoftSweepInitFreq: 0.1 #maximum initial selected frequency for soft sweeps
