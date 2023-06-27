@@ -12,5 +12,7 @@ logs_slurm/*
 stairwayplot/*
 workflows/.snakemake/*
 .tests/*
-
+train/
+test/
+trainingSets/
 

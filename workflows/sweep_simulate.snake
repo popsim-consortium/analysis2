@@ -799,7 +799,7 @@ rule diploshic_fvs:
 rule diploshic_pred:
     input:
         rules.diploshic_fvs.output,
-        rules.diploshic_all.output
+        rules.diploshic_train_classifier.output
     output:
         output_dir + '/simulated_data/sweeps/{middle}/sim_{chrom}_{left}_{right}.diploshic.preds'
     
