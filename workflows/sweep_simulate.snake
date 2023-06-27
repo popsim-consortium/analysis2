@@ -510,7 +510,7 @@ pred_outs = [file_prefix+".diploshic.preds" for file_prefix in neutral_outs_pref
 
 rule all:
     input:
-       # rules.diploshic_all.input,
+        rules.diploshic_all.input,
         boundary_outs + trees_outs + stats_outs + vcf_outs + [output_dir + f'/simulated_data/sweeps/all_sims.stats.tsv', output_dir+f'/simulated_data/sweeps/rec_map_{chrom}_{config["num_windows"]}.tsv'] + annot_outs +anc_outs + fv_outs + pred_outs
     default_target: True
 
