@@ -411,6 +411,18 @@ def dump_results(input, output, params_dict, target_pops, num_subwins=1):
         tss = tss.delete_intervals(del_intervals)
         tss = tss.trim()
     tss.write_vcf(fh_vcf)
+    fh_vcf.close()
+    # write seqlen of shortened ts
+    with open(output[2], 'w') as f:
+        f.write(str(int(tss.sequence_length)))
+    # write anc file
+    seq = list("A" * int(tss.sequence_length))
+    with open(output[3], "w") as f:
+        f.write(">1\n")
+        for v in tss.variants():
+            seq[int(v.site.position)] = v.alleles[0]
+        f.write(''.join(seq) + "\n")
+
     # Computing tsstats diversity
     divs, windows = compute_stats(ts, sample_sets, num_subwins=num_subwins)
     assert divs.shape == (num_subwins,len(target_pops))
@@ -452,9 +464,11 @@ def write_diploshic_sampleToPopFile(ts, filename, key):
     f.close()
 
 
-def write_diploshic_files(ts_path, anc_path):
+def write_diploshic_files(ts_path,sl_path, anc_path):
     ts = tskit.load(ts_path)
-    seq = list("A" * int(ts.sequence_length))
+    with open(sl_path,'r') as f:
+        seq_len = f.read().strip()
+    seq = list("A" * int(seq_len))
     with open(anc_path, "w") as f:
         f.write(">1\n")
         for v in ts.variants():
@@ -693,6 +707,9 @@ rule get_stats:
     output:
         output_dir + "/simulated_data/sweeps/{middle}/sim_{chrom}_{left}_{right}.stats.tsv", 
         output_dir + "/simulated_data/sweeps/{middle}/sim_{chrom}_{left}_{right}.vcf",
+        output_dir + "/simulated_data/sweeps/{middle}/sim_{chrom}_{left}_{right}.seqlen",
+        output_dir + "/simulated_data/sweeps/{middle}/sim_{chrom}_{left}_{right}.diploshic.ancFile",
+
     resources: time=3000, mem_mb=2000
     run:
         target_pops = None
@@ -765,23 +782,17 @@ rule get_sw_stats:
 """
 
 
-rule diploshic_files:
-   input: 
-       output_dir + '/simulated_data/sweeps/{middle}/sim_{chrom}_{left}_{right}.trees'
-   output:
-       output_dir + '/simulated_data/sweeps/{middle}/sim_{chrom}_{left}_{right}.diploshic.ancFile'
-   run:
-        write_diploshic_files(input[0], output[0])
-
 rule diploshic_fvs:
    input: 
-       output_dir + '/simulated_data/sweeps/{middle}/sim_{chrom}_{left}_{right}.trees',
+       output_dir + '/simulated_data/sweeps/{middle}/sim_{chrom}_{left}_{right}.seqlen',
        output_dir + '/simulated_data/sweeps/{middle}/sim_{chrom}_{left}_{right}.vcf',
-       rules.diploshic_files.output
+       output_dir + '/simulated_data/sweeps/{middle}/sim_{chrom}_{left}_{right}.diploshic.ancFile',
+
    output:
        output_dir + '/simulated_data/sweeps/{middle}/sim_{chrom}_{left}_{right}.diploshic.fv'
    run:
-        seq_len = tskit.load(input[0]).sequence_length
+        with open(input[0],'r') as f:
+            seq_len = f.read().strip()
         cmd = f"diploSHIC fvecVcf haploid {input[1]} 1 {int(seq_len)} {output[0]} --ancFileName {input[2]}"    
         shell(cmd)    
 
