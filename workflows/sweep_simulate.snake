@@ -436,7 +436,7 @@ module diploshic_workflow:
         "diploshic_params.yaml"
 
 
-#use rule * from diploshic_workflow as diploshic_*
+use rule * from diploshic_workflow as diploshic_*
 
 
 #### diploshic helpers ##########
@@ -506,11 +506,13 @@ vcf_outs = [file_prefix+".vcf" for file_prefix in neutral_outs_prefix + bgs_outs
 annot_outs = [output_dir + f'/simulated_data/sweeps/annot_overlap_{annot}_{chrom}_{config["num_windows"]}.tsv' for annot in annotation_list]
 anc_outs = [file_prefix+".diploshic.ancFile" for file_prefix in neutral_outs_prefix + bgs_outs_prefix + sw_outs_prefix]
 fv_outs = [file_prefix+".diploshic.fv" for file_prefix in neutral_outs_prefix + bgs_outs_prefix + sw_outs_prefix]
+pred_outs = [file_prefix+".diploshic.preds" for file_prefix in neutral_outs_prefix + bgs_outs_prefix + sw_outs_prefix]
 
 rule all:
     input:
        # rules.diploshic_all.input,
-        boundary_outs + trees_outs + stats_outs + vcf_outs + [output_dir + f'/simulated_data/sweeps/all_sims.stats.tsv', output_dir+f'/simulated_data/sweeps/rec_map_{chrom}_{config["num_windows"]}.tsv'] + annot_outs +anc_outs + fv_outs
+        boundary_outs + trees_outs + stats_outs + vcf_outs + [output_dir + f'/simulated_data/sweeps/all_sims.stats.tsv', output_dir+f'/simulated_data/sweeps/rec_map_{chrom}_{config["num_windows"]}.tsv'] + annot_outs +anc_outs + fv_outs + pred_outs
+    default_target: True
 
 rule write_rec:
     input:
@@ -781,7 +783,20 @@ rule diploshic_fvs:
    run:
         seq_len = tskit.load(input[0]).sequence_length
         cmd = f"diploSHIC fvecVcf haploid {input[1]} 1 {int(seq_len)} {output[0]} --ancFileName {input[2]}"    
-        shell(cmd)            
+        shell(cmd)    
+
+rule diploshic_pred:
+    input:
+        rules.diploshic_fvs.output,
+        rules.diploshic_all.output
+    output:
+        output_dir + '/simulated_data/sweeps/{middle}/sim_{chrom}_{left}_{right}.diploshic.preds'
+    
+    run:
+        cmd = f"export CUDA_VISIBLE_DEVICES=\"\" && diploSHIC predict trained_model.json trained_model.weights.hdf5 {input[0]} {output[0]}" 
+        shell(cmd)   
+
+
 
 
 
