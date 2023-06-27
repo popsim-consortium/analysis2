@@ -153,8 +153,7 @@ rule train_classifier:
         "trained_model.weights.hdf5"
     run:
         # cpu training below
-        shell('export CUDA_VISIBLE_DEVICES=\"\"')
-        cmd = f"{diploSHIC_exec} train trainingSets/ trainingSets/ trained_model --epochs=10"
+        cmd = f"export CUDA_VISIBLE_DEVICES=\"\" && {diploSHIC_exec} train trainingSets/ trainingSets/ trained_model --epochs=100"
         shell(cmd)
 
 rule clean:
