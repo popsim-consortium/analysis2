@@ -25,7 +25,6 @@ testSampleNumber = params['testSampleNumber'] #the number of simulations to crea
 sampleSize = params['sampleSize'] #the number of individuals in our population sample
 numSites = params['numSites'] #total number of sites in our simulated window (i.e. S/HIC's subwindow size * 11)
 u = params['u'] #per-site mutation rate (used to calculate mean theta)
-gensPerYear = params['gensPerYear'] #number of generations per year
 maxSoftSweepInitFreq = params['maxSoftSweepInitFreq'] #maximum initial selected frequency for soft sweeps
 tauHigh = params['tauHigh'] #maximum FIXATION (not mutation) time (in units of 4N generations ago) in the past
 rhoOverTheta = params['rhoOverTheta'] #crossover rate over mut rate (used to calculate mean rho)
@@ -152,7 +151,8 @@ rule train_classifier:
         "trained_model.json",
         "trained_model.weights.hdf5"
     run:
-        cmd = f"{diploSHIC_exec} train trainingSets/ trainingSets/ trained_model --epochs=10"
+        # cpu training below
+        cmd = f"export CUDA_VISIBLE_DEVICES=\"\" && {diploSHIC_exec} train trainingSets/ trainingSets/ trained_model --epochs=100"
         shell(cmd)
 
 rule clean:
