@@ -73,9 +73,10 @@ class StairwayPlotRunner(object):
             class_muts = {}
             for dfe in ts.metadata["stdpopsim"]["DFEs"]:
                 for mt in dfe["mutation_types"]:
-                    mid = mt["slim_mutation_type_id"]
-                    if not mid in class_muts:
-                        class_muts[mid] = "neutral" if mt["is_neutral"] else "non_neutral"
+                    mids = mt["slim_mutation_type_id"]
+                    for mid in mids:
+                        if not mid in class_muts:
+                            class_muts[mid] = "neutral" if mt["is_neutral"] else "non_neutral"
 
             site_class = np.empty(ts.num_sites, dtype=object)
 
