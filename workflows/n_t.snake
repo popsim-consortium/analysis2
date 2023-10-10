@@ -23,7 +23,6 @@ import gone
 import plots
 import masks
 
-# TODO: Add support for population_id list, right now it runs on all pops
 # TODO: add support for running some but not all inference methods
 # NOTE: see other todo specific to rule below
 # ###############################################################################
@@ -41,8 +40,6 @@ species = stdpopsim.get_species(config["species"])
 
 # This is the number of samples to simulate for within each population
 # for each replicate
-# TODO double check this is up to date with stdpopsim backend 
-population_id = config["population_id"]
 
 # Here is a list of sample sizes to run msmc on. 
 # Each element counts as its own analysis
@@ -53,7 +50,6 @@ num_sampled_genomes_msmc =  config["num_sampled_genomes_msmc"]
 # typically 20
 num_msmc_iterations = config["num_msmc_iterations"]
 
-num_sampled_genomes_per_replicate = config["num_sampled_genomes_per_replicate"]
 
 # The number of replicates of each analysis you would like to run
 # For now leaving it a 1 just to get results quickly
@@ -292,7 +288,6 @@ rule plot_compound_stairway:
 # TODO: ln 379, get wildcards.samps to work so that num_sampled_genomes_msmc are run in parallel
 # sample size
 num_sampled_genomes_msmc =  config["num_sampled_genomes_msmc"]
-num_sampled_genomes_per_replicate = config["num_sampled_genomes_per_replicate"]
 # The number of msmc Baumwelch iterations to run
 num_msmc_iterations = config["num_msmc_iterations"]
 msmc_exec = config["msmc_exec"]
