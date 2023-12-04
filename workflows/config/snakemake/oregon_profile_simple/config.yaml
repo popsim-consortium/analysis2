@@ -1,7 +1,7 @@
 cluster:
         mkdir -p logs/{rule} &&
         sbatch
-                --partition=kern,kerngpu
+                --partition=kern,kerngpu,memory,memorylong,compute,computelong,preempt
                 --account=kernlab
                 --cpus-per-task={threads}
                 --mem={resources.mem_mb}

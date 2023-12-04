@@ -18,7 +18,7 @@ demo_model:
 
 # BGS configs
 dfe_list: 
-  - Gamma_H17
+  - Gamma_K17
 annotation_list: 
   - ensembl_havana_104_exons
 
@@ -33,7 +33,7 @@ num_subwins: 10 # number of subwindows within focal to compute statistic
 coeffs: 
   bounds: [0.03, 0.1]
   grid_size: 1 # This will yield just one s=0.03 or 2Ns~600
-sweep_min_freq: 0.8
+sweep_min_freq: 0.95
 time_multipliers: [1]
 
 # slim settings

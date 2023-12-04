@@ -11,8 +11,8 @@ import math
 import subprocess
 from scipy.optimize import root_scalar
 
-#configfile: "workflows/config/snakemake/sweep_config.yaml"
-configfile: "workflows/config/snakemake/small_sweep.yaml"
+configfile: "workflows/config/snakemake/sweep_config.yaml"
+#configfile: "workflows/config/snakemake/small_sweep.yaml"
 
 rng = np.random.default_rng(seed=config["seed"])
 rng2 = np.random.default_rng(seed=config["seed"]+1)
@@ -371,6 +371,11 @@ def compute_stats(ts, sample_sets, num_subwins=1):
 
 
 # ------------ Wrapper to aggregate results --------------
+def _print_stat_line(statname, stats, windows, target_pops, meta_str, fh):
+    assert stats.shape == (windows.shape[0],len(target_pops))
+    for i in range(windows.shape[0]):
+        for j in range(len(target_pops)):
+            print(f'{meta_str}\t{target_pops[j]}\t{windows[i,0]:.0f}\t{windows[i,1]:.0f}\t{statname}\t{stats[i,j]:.4e}', file=fh, flush=True)
 
 def dump_results(input, output, params_dict, target_pops, num_subwins=1):
     """
@@ -390,11 +395,6 @@ def dump_results(input, output, params_dict, target_pops, num_subwins=1):
     header = "\t".join(meta + ['pop','stat_left', 'stat_right', 'stat_name', 'stat_val'])
     meta_str = "\t".join([params_dict[m] for m in meta])
     print(f'{header}', file=fh, flush=True)
-    def _print_stat_line(statname, stats, windows, target_pops, fh):
-        assert stats.shape == (windows.shape[0],len(target_pops))
-        for i in range(windows.shape[0]):
-            for j in range(len(target_pops)):
-                print(f'{meta_str}\t{target_pops[j]}\t{windows[i,0]:.0f}\t{windows[i,1]:.0f}\t{statname}\t{stats[i,j]:.4e}', file=fh, flush=True)
     
     # Outputting VCF
     fh_vcf = open(output[1], 'w')
@@ -410,7 +410,7 @@ def dump_results(input, output, params_dict, target_pops, num_subwins=1):
     if len(del_intervals) > 0:
         tss = tss.delete_intervals(del_intervals)
         tss = tss.trim()
-    tss.write_vcf(fh_vcf)
+    tss.write_vcf(fh_vcf, position_transform = lambda x: np.fmax(1, np.round(x)))
     fh_vcf.close()
     # write seqlen of shortened ts
     with open(output[2], 'w') as f:
@@ -422,15 +422,16 @@ def dump_results(input, output, params_dict, target_pops, num_subwins=1):
         for v in tss.variants():
             seq[int(v.site.position)] = v.alleles[0]
         f.write(''.join(seq) + "\n")
-
+    # outputting diploshic samples to pop
+    write_diploshic_sampleToPopFile(ts, target_pops, output[4])
     # Computing tsstats diversity
     divs, windows = compute_stats(ts, sample_sets, num_subwins=num_subwins)
     assert divs.shape == (num_subwins,len(target_pops))
     assert windows.shape == (num_subwins,2)
-    _print_stat_line("div", divs, windows, target_pops, fh)
+    _print_stat_line("div", divs, windows, target_pops, meta_str, fh)
 
     clrs, windows = compute_clr(input[0], recmap, model, samples, sample_sets)
-    _print_stat_line("clr", clrs, windows, target_pops, fh)
+    _print_stat_line("clr", clrs, windows, target_pops, meta_str, fh)
 
     fh.close()
 
@@ -453,29 +454,21 @@ use rule * from diploshic_workflow as diploshic_*
 
 #### diploshic helpers ##########
 
-def write_diploshic_sampleToPopFile(ts, filename, key):
-    samp_dict = demo_sample_size_dict[key]
+def write_diploshic_sampleToPopFile(ts, target_pops, filename):
+    all_pops_in_ts = [pop.metadata['name'] for pop in ts.populations()]
+    samp_dict = {pop: ts.samples(population=all_pops_in_ts.index(pop)) for pop in target_pops}
     with open(filename, "w") as f:
         count = 0
-        for pop in samp_dict:
-            for i in range(samp_dict[pop]):
-                f.write(f"tsk_{count}\t{pop}\n")
+        for pop, samps in samp_dict.items():
+            ind_samps = ts.nodes_individual[samps]
+            assert np.all(np.diff(ind_samps)[::2]==0)
+            for samp in ind_samps[::2]:
+                # if there is only one target pop, then the other samples will be simplified out, so we need to start from 0
+                if len(target_pops) == 1:
+                    samp = count
+                f.write(f"tsk_{samp}\t{pop}\n")
                 count += 1
     f.close()
-
-
-def write_diploshic_files(ts_path,sl_path, anc_path):
-    ts = tskit.load(ts_path)
-    with open(sl_path,'r') as f:
-        seq_len = f.read().strip()
-    seq = list("A" * int(seq_len))
-    with open(anc_path, "w") as f:
-        f.write(">1\n")
-        for v in ts.variants():
-            seq[int(v.site.position)] = v.alleles[0]
-        f.write(''.join(seq) + "\n")
-    f.close()
-
 
 
 # ###############################################################################
@@ -513,19 +506,37 @@ sw_outs_prefix = [output_dir +  f"/simulated_data/sweeps/sweep/{demo_model['id']
     for popu in pop_list
     for tmult in time_mults
 ]
+sw_outs_prefix_pop = [output_dir +  f"/simulated_data/sweeps/sweep/{demo_model['id']}/{popu}/{annot}/{dfe}/{coeff}/{tmult}/{seed}/sim_{chrom}_{left:.0f}_{right:.0f}_{popu}"
+    for left, right in windows
+    for seed in seed_array
+    for dfe in dfe_list
+    for annot in annotation_list
+    for coeff in sel_coeffs
+    for popu in pop_list
+    for tmult in time_mults
+] + [output_dir +  f"/simulated_data/sweeps/sweep/{demo_model['id']}/{popu}/NA/NA/{coeff}/{tmult}/{seed}/sim_{chrom}_{left:.0f}_{right:.0f}_{popu}"
+    for left, right in windows
+    for seed in seed_array
+    for coeff in sel_coeffs
+    for popu in pop_list
+    for tmult in time_mults
+]
 
 trees_outs = [file_prefix+".trees" for file_prefix in neutral_outs_prefix + bgs_outs_prefix + sw_outs_prefix]
 stats_outs = [file_prefix+".stats.tsv" for file_prefix in neutral_outs_prefix + bgs_outs_prefix + sw_outs_prefix]
 vcf_outs = [file_prefix+".vcf" for file_prefix in neutral_outs_prefix + bgs_outs_prefix + sw_outs_prefix]
 annot_outs = [output_dir + f'/simulated_data/sweeps/annot_overlap_{annot}_{chrom}_{config["num_windows"]}.tsv' for annot in annotation_list]
 anc_outs = [file_prefix+".diploshic.ancFile" for file_prefix in neutral_outs_prefix + bgs_outs_prefix + sw_outs_prefix]
-fv_outs = [file_prefix+".diploshic.fv" for file_prefix in neutral_outs_prefix + bgs_outs_prefix + sw_outs_prefix]
-pred_outs = [file_prefix+".diploshic.preds" for file_prefix in neutral_outs_prefix + bgs_outs_prefix + sw_outs_prefix]
+fv_outs = [file_prefix+f"_{popu}.diploshic.fv" for file_prefix in neutral_outs_prefix + bgs_outs_prefix for popu in pop_list] + [file_prefix+".diploshic.fv" for file_prefix in sw_outs_prefix_pop]
+pred_outs = [file_prefix+f"_{popu}.diploshic.preds" for file_prefix in neutral_outs_prefix + bgs_outs_prefix for popu in pop_list] + [file_prefix+".diploshic.preds" for file_prefix in sw_outs_prefix_pop]
+shic_outs1 = [file_prefix+f"_{popu}.stats.tsv.shic" for file_prefix in neutral_outs_prefix for popu in pop_list]
+shic_outs2 = [file_prefix+f"_{popu}.stats.tsv.shic" for file_prefix in bgs_outs_prefix for popu in pop_list]
+shic_outs3 = [file_prefix+".stats.tsv.shic" for file_prefix in sw_outs_prefix_pop]
 
 rule all:
     input:
         rules.diploshic_all.input,
-        boundary_outs + trees_outs + stats_outs + vcf_outs + [output_dir + f'/simulated_data/sweeps/all_sims.stats.tsv', output_dir+f'/simulated_data/sweeps/rec_map_{chrom}_{config["num_windows"]}.tsv'] + annot_outs +anc_outs + fv_outs + pred_outs
+        boundary_outs + trees_outs + stats_outs + vcf_outs + [output_dir + f'/simulated_data/sweeps/all_sims.stats.tsv', output_dir+f'/simulated_data/sweeps/rec_map_{chrom}_{config["num_windows"]}.tsv'] + annot_outs +anc_outs + fv_outs + pred_outs + shic_outs1 + shic_outs2 + shic_outs3
     default_target: True
 
 rule write_rec:
@@ -574,7 +585,7 @@ rule neutral:
     input:
     output:
         output_dir + f"/simulated_data/sweeps/neutral/{demo_model['id']}/{{seed}}/sim_{chrom}_{{left}}_{{right}}.trees", 
-    resources: time=3000, mem_mb=2000
+    resources: time=3000, mem_mb=8000
     run:
         model = species.get_demographic_model(demo_model["id"])
         mutation_rate = model.mutation_rate
@@ -645,7 +656,7 @@ rule sweep:
     input:
     output:
         output_dir + f"/simulated_data/sweeps/sweep/{demo_model['id']}/{{popu}}/{{annot}}/{{dfe}}/{{coeff}}/{{tmult}}/{{seed}}/sim_{{chrom}}_{{left}}_{{right}}.trees", 
-    resources: time=3000, mem_mb=8000
+    resources: time=3000, mem_mb=16000
     run:
         model = species.get_demographic_model(demo_model["id"])
         mutation_rate = model.mutation_rate
@@ -701,6 +712,35 @@ rule sweep:
         ts = add_window_metadata(ts, window_left, window_right, b_window_left, b_window_right, extra=f"sweep_time={time};")
         ts.dump(output[0])
 
+def _get_params_dict_from_wildcards(wildcards):
+    target_pops = None
+    params_list = wildcards.middle.split("/")
+    model = params_list[0]
+    demo = params_list[1]
+    seed = params_list[-1]
+    params_dict = {
+                    "model":model,
+                    "demo":demo,
+                    "seed":seed,
+                    "annot":"NA",
+                    "dfe":"NA",
+                    "coeff":"NA",
+                    "tmult":"NA",
+                    "chrom": wildcards.chrom,
+                    "sim_left": wildcards.left,
+                    "sim_right": wildcards.right
+                }
+    assert model in ["neutral", "bgs", "sweep"]
+    if model == "bgs":
+        params_dict["annot"] = params_list[2]
+        params_dict["dfe"] = params_list[3]
+    if model == "sweep":
+        target_pops = [params_list[2]]
+        params_dict["annot"] = params_list[3]
+        params_dict["dfe"] = params_list[4]
+        params_dict["coeff"] = params_list[5]
+        params_dict["tmult"] = params_list[6]
+    return params_dict, target_pops
 
 rule get_stats:
     input: output_dir + '/simulated_data/sweeps/{middle}/sim_{chrom}_{left}_{right}.trees'
@@ -709,50 +749,117 @@ rule get_stats:
         output_dir + "/simulated_data/sweeps/{middle}/sim_{chrom}_{left}_{right}.vcf",
         output_dir + "/simulated_data/sweeps/{middle}/sim_{chrom}_{left}_{right}.seqlen",
         output_dir + "/simulated_data/sweeps/{middle}/sim_{chrom}_{left}_{right}.diploshic.ancFile",
+        output_dir + "/simulated_data/sweeps/{middle}/sim_{chrom}_{left}_{right}.diploshic.samples"
 
     resources: time=3000, mem_mb=2000
     run:
-        target_pops = None
-        params_list = wildcards.middle.split("/")
-        model = params_list[0]
-        demo = params_list[1]
-        seed = params_list[-1]
-        params_dict = {
-                        "model":model,
-                        "demo":demo,
-                        "seed":seed,
-                        "annot":"NA",
-                        "dfe":"NA",
-                        "coeff":"NA",
-                        "tmult":"NA",
-                        "chrom": wildcards.chrom,
-                        "sim_left": wildcards.left,
-                        "sim_right": wildcards.right
-                    }
-        assert model in ["neutral", "bgs", "sweep"]
-        if model == "bgs":
-            params_dict["annot"] = params_list[2]
-            params_dict["dfe"] = params_list[3]
-        if model == "sweep":
-            target_pops = [params_list[2]]
-            params_dict["annot"] = params_list[3]
-            params_dict["dfe"] = params_list[4]
-            params_dict["coeff"] = params_list[5]
-            params_dict["tmult"] = params_list[6]
+        params_dict, target_pops = _get_params_dict_from_wildcards(wildcards)
         dump_results(input, output, params_dict, target_pops, config["num_subwins"])
+
+
+rule diploshic_fvs:
+    input: 
+        output_dir + '/simulated_data/sweeps/{middle}/sim_{chrom}_{left}_{right}.seqlen',
+        output_dir + '/simulated_data/sweeps/{middle}/sim_{chrom}_{left}_{right}.vcf',
+        output_dir + '/simulated_data/sweeps/{middle}/sim_{chrom}_{left}_{right}.diploshic.ancFile',
+        output_dir + "/simulated_data/sweeps/{middle}/sim_{chrom}_{left}_{right}.diploshic.samples"
+
+    output:
+        output_dir + '/simulated_data/sweeps/{middle}/sim_{chrom}_{left}_{right}_{popu}.diploshic.fv'
+    resources: time=30, mem_mb=1200
+    run:
+        with open(input[0],'r') as f:
+            seq_len = f.read().strip()
+        cmd = f"diploSHIC fvecVcf haploid {input[1]} 1 {int(seq_len)} {output[0]} --targetPop {wildcards.popu} --sampleToPopFileName {input[3]} --winSize 2200000 --ancFileName {input[2]}"
+        shell(cmd)    
+
+
+rule diploshic_pred:
+    input:
+        rules.diploshic_fvs.output,
+        rules.diploshic_train_classifier.output
+    output:
+        output_dir + '/simulated_data/sweeps/{middle}/sim_{chrom}_{left}_{right}_{popu}.diploshic.preds'
+    resources: time=30, mem_mb=1200
+    run:
+        cmd = f"export CUDA_VISIBLE_DEVICES=\"\" && diploSHIC predict trained_model.json trained_model.weights.hdf5 {input[0]} {output[0]}" 
+        shell(cmd)   
+
+
+rule add_diploshic_preds_to_stats:
+    input: output_dir + "/simulated_data/sweeps/{middle}/sim_{chrom}_{left}_{right}.trees",
+            output_dir + "/simulated_data/sweeps/{middle}/sim_{chrom}_{left}_{right}_{popu}.diploshic.preds"
+    output: output_dir + "/simulated_data/sweeps/{middle}/sim_{chrom}_{left}_{right}_{popu}.stats.tsv.shic"
+    resources: time=30, mem_mb=600
+    run:
+        params_dict, target_pops = _get_params_dict_from_wildcards(wildcards)
+        target_pops = [wildcards.popu]
+        meta = ["model", "demo", "seed", "chrom", "sim_left", "sim_right", "annot", "dfe", "coeff", "tmult"]
+        meta_str = "\t".join([params_dict[m] for m in meta])
+        
+        ts = tskit.load(input[0])
+
+        df = pd.read_csv(input[1], sep="\t")
+        df.classifiedWinStart = df.classifiedWinStart - 1 + ts.metadata['windowing']['window_left']
+        df.classifiedWinEnd = df.classifiedWinEnd + ts.metadata['windowing']['window_left']
+        assert np.all(df.classifiedWinStart <= ts.metadata['windowing']['window_right'])
+        assert np.all(df.classifiedWinEnd <= ts.metadata['windowing']['window_right'])
+        assert np.all(df.classifiedWinStart > ts.metadata['windowing']['window_left']+1)
+        windows = df.iloc[:,[1,2]].to_numpy().astype(np.int32)
+        stats = 1 - df.iloc[:,5].to_numpy().astype(np.float32) # prob non neutral
+        stats = np.expand_dims(stats, axis = 1) # adding another dim going from (n_wins,) to (n_wins,1)
+        fh = open(output[0], 'w')
+        _print_stat_line("diploshic", stats, windows, target_pops, meta_str, fh)
+        fh.close()
 
 
 rule merge_stats:
     input: stats_outs
     output:
-        output_dir + f'/simulated_data/sweeps/all_sims.stats.tsv'
-    resources: time=3000, mem_mb=48000, disk_mb=48000
+        output_dir + f'/simulated_data/sweeps/all_sims.tmp.stats.tsv'
+    resources: time=3000, mem_mb=350000, disk_mb=350000
     run:
         #print(input, flush=True)
         #import pdb; pdb.set_trace()
         df = pd.concat(map(lambda x: pd.read_csv(x, sep="\t"), input))
         df.to_csv(output[0], sep="\t", index=False)
+rule merge_stats_shic1:
+    input: shic_outs1
+    output:
+        output_dir + f'/simulated_data/sweeps/all_sims1.shic.stats.tsv'
+    resources: time=3000, mem_mb=150000, disk_mb=150000
+    run:
+        #print(input, flush=True)
+        #import pdb; pdb.set_trace()
+        df = pd.concat(map(lambda x: pd.read_csv(x, sep="\t", header=None), input))
+        df.to_csv(output[0], sep="\t", index=False, header=None)
+rule merge_stats_shic2:
+    input: shic_outs2
+    output:
+        output_dir + f'/simulated_data/sweeps/all_sims2.shic.stats.tsv'
+    resources: time=3000, mem_mb=150000, disk_mb=150000
+    run:
+        #print(input, flush=True)
+        #import pdb; pdb.set_trace()
+        df = pd.concat(map(lambda x: pd.read_csv(x, sep="\t", header=None), input))
+        df.to_csv(output[0], sep="\t", index=False, header=None)
+rule merge_stats_shic3:
+    input: shic_outs3
+    output:
+        output_dir + f'/simulated_data/sweeps/all_sims3.shic.stats.tsv'
+    resources: time=3000, mem_mb=150000, disk_mb=150000
+    run:
+        #print(input, flush=True)
+        #import pdb; pdb.set_trace()
+        df = pd.concat(map(lambda x: pd.read_csv(x, sep="\t", header=None), input))
+        df.to_csv(output[0], sep="\t", index=False, header=None)
 
+rule merge_all_stats:
+    input: [output_dir + f'/simulated_data/sweeps/all_sims.tmp.stats.tsv', output_dir + f'/simulated_data/sweeps/all_sims3.shic.stats.tsv', output_dir + f'/simulated_data/sweeps/all_sims2.shic.stats.tsv', output_dir + f'/simulated_data/sweeps/all_sims1.shic.stats.tsv']
+    output: output_dir + f'/simulated_data/sweeps/all_sims.stats.tsv'
+    resources: time=3000, mem_mb=150000, disk_mb=150000
+    shell:
+       "cat {input} > {output}"
 
 """
 rule get_neut_stats:
@@ -780,33 +887,6 @@ rule get_sw_stats:
     run:
         dump_results(input, output)
 """
-
-
-rule diploshic_fvs:
-   input: 
-       output_dir + '/simulated_data/sweeps/{middle}/sim_{chrom}_{left}_{right}.seqlen',
-       output_dir + '/simulated_data/sweeps/{middle}/sim_{chrom}_{left}_{right}.vcf',
-       output_dir + '/simulated_data/sweeps/{middle}/sim_{chrom}_{left}_{right}.diploshic.ancFile',
-
-   output:
-       output_dir + '/simulated_data/sweeps/{middle}/sim_{chrom}_{left}_{right}.diploshic.fv'
-   run:
-        with open(input[0],'r') as f:
-            seq_len = f.read().strip()
-        cmd = f"diploSHIC fvecVcf haploid {input[1]} 1 {int(seq_len)} {output[0]} --ancFileName {input[2]}"    
-        shell(cmd)    
-
-rule diploshic_pred:
-    input:
-        rules.diploshic_fvs.output,
-        rules.diploshic_train_classifier.output
-    output:
-        output_dir + '/simulated_data/sweeps/{middle}/sim_{chrom}_{left}_{right}.diploshic.preds'
-    
-    run:
-        cmd = f"export CUDA_VISIBLE_DEVICES=\"\" && diploSHIC predict trained_model.json trained_model.weights.hdf5 {input[0]} {output[0]}" 
-        shell(cmd)   
-
 
 
 
