@@ -81,7 +81,7 @@ def gather_inference_results(output_dir, demog, output, method, chrm_mask,
                 annot_mask_i = annot
             if method == "stairwayplot":
                 nt = pd.read_csv(infile, sep="\t", skiprows=5)
-                nt.columns = nt.columns.str.replace('[%,.]','')
+                nt.columns = nt.columns.str.replace('%','').str.replace('.', '').str.replace(',', '')
                 for row in nt.itertuples():
                     f.write(f'{method},{pop},{size},{dfe},{annot},{row.year},{row.Ne_median},{seed},{chrm_mask_i},{annot_mask_i},{slim_scaling_factor},{getattr(row, "Ne_25")},{getattr(row, "Ne_975")}\n')
             elif method == "msmc":

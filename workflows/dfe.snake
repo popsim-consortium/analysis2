@@ -121,7 +121,7 @@ rule dadi_infer_dm:
     threads: 8
     shell:
         """
-        dadi-cli InferDM --fs {input} --model {params.demog} --p0 {params.demog_p0} --ubounds {params.demog_ubounds} --lbounds {params.demog_lbounds} --output-prefix {params.prefix} --optimizations {params.opts} --grids {params.grid_size} --cpus {threads} --nomisid --force-convergence
+        dadi-cli InferDM --fs {input} --model {params.demog} --p0 {params.demog_p0} --ubounds {params.demog_ubounds} --lbounds {params.demog_lbounds} --output-prefix {params.prefix} --optimizations {params.opts} --grids {params.grid_size} --cpus {threads} --nomisid --force-convergence 1
 
         """
 
@@ -161,7 +161,7 @@ rule dadi_infer_dfe:
     threads: 8
     shell:
         """
-        dadi-cli InferDFE --fs {input[0]} --cache1d {input[1]} --demo-popt {input[2]} --output-prefix {params.prefix} --pdf1d {params.dfe} --p0 {params.dfe_p0} --ubounds {params.dfe_ubounds} --lbounds {params.dfe_lbounds} --ratio {params.ratio} --optimizations {params.opts} --cpus {threads} --nomisid --force-convergence
+        dadi-cli InferDFE --fs {input[0]} --cache1d {input[1]} --demo-popt {input[2]} --output-prefix {params.prefix} --pdf1d {params.dfe} --p0 {params.dfe_p0} --ubounds {params.dfe_ubounds} --lbounds {params.dfe_lbounds} --ratio {params.ratio} --optimizations {params.opts} --cpus {threads} --nomisid --force-convergence 1
 
         """
 
@@ -249,19 +249,18 @@ rule download_dfe_alpha:
     output:
         "ext/dfe-alpha-release-2.16/est_dfe",
         "ext/dfe-alpha-release-2.16/data/n1_100/s_evaluated.dat"
-
     shell:
         """
         cd ext
-        wget -c https://sourceforge.net/projects/dfe-alpha-k-e-w/files/dfe-alpha-release-2.16.tar.gz/download
-        mv download dfe-alpha-release-2.16.tar.gz
-        tar -xvf dfe-alpha-release-2.16.tar.gz
-        cat dfe_alpha_makefile_stdpopsim_patch > dfe-alpha-release-2.16/Makefile && cd dfe-alpha-release-2.16 && make
+        mkdir -p dfe-alpha-release-2.16/
+        cd dfe-alpha-release-2.16/
+        wget -O est_dfe http://sesame.uoregon.edu/~stittes/stdpopsim/est_dfe
+        chmod u+x est_dfe
         wget http://sesame.uoregon.edu/~adkern/stdpopsim/data.tar.gz && tar -xvf data.tar.gz && rm -f data.tar.gz
         # old location of above
         #  https://datashare.ed.ac.uk/bitstream/handle/10283/2730/data.tar.gz?sequence=1&isAllowed=y
         cd ../
-        rm dfe-alpha-release-2.16.tar.gz
+        rm -f dfe-alpha-release-2.16.tar.gz
         cd ../
         """
         
