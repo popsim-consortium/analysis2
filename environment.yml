@@ -39,6 +39,7 @@ dependencies:
   - r-patchwork
   - r-scales
   - r-ggnewscale
+  - r-quantreg
   - libprotobuf=3.21.12
   - pip:
     - git+https://github.com/popsim-consortium/stdpopsim.git
