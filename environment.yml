@@ -10,7 +10,7 @@ dependencies:
   - mpfr
   - pip
   - slim==4.0
-  - snakemake
+  - snakemake==7.32.4
   - ldc
   - seaborn
   - pysam
@@ -41,6 +41,7 @@ dependencies:
   - libprotobuf=3.21.12
   - pip:
     - git+https://github.com/popsim-consortium/stdpopsim.git
+    - git+https://github.com/popgenmethods/smcpp
     - scikit-allel
     - git+https://github.com/xin-huang/dadi-cli
     - diploSHIC

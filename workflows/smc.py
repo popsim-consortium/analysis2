@@ -40,7 +40,7 @@ def write_smcpp_file(path, output, pop_name, num_sampled_genomes=2, mask_interva
     with open(vcf_file, "w") as vcf:
         ts.write_vcf(vcf, contig_id=chr_name)  # site_mask=np.array(bool)
     # index/compress the vcf
-    cmd = f"bgzip {vcf_file}"
+    cmd = f"bgzip -f {vcf_file}"
     logging.info("Running:" + cmd)
     subprocess.run(cmd, shell=True, check=True)
     vz_file = f"{vcf_file}.gz"
@@ -50,7 +50,7 @@ def write_smcpp_file(path, output, pop_name, num_sampled_genomes=2, mask_interva
     # write mask file
     if mask_intervals is not None:
         intervals2BedFile(mask_intervals, mask_outfile, chr_name)
-        cmd = f"bgzip {mask_outfile}"
+        cmd = f"bgzip -f {mask_outfile}"
         logging.info("Running:" + cmd)
         subprocess.run(cmd, shell=True, check=True)
         cmd = f"tabix -p bed {mask_outfile}.gz"
