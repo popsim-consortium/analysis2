@@ -5,6 +5,7 @@ import subprocess
 import tskit
 import os
 import numpy as np
+import msprime
 import pandas as pd
 
 def params(gone_code, params):
@@ -47,14 +48,17 @@ def copy(gone_code, outpath, seed, threads):
     subprocess.run(cmd, shell=True, check=True)
 
 
-def ts2plink(ts_path, ped_file, map_file, pop_name, genetic_map, chromID, mask_intervals):
+def ts2plink(ts_path, ped_file, map_file, species, pop_name, genetic_map, chromID, mask_intervals):
     """
     converts ts to plink format
     masks are the intervals to exclude
     """
     if type(mask_intervals) is not list:
         mask_intervals = [mask_intervals]
-    gm_chr = [genetic_map.get_chromosome_map(chrms) for chrms in chromID]
+    if genetic_map is not None:
+        gm_chr = [genetic_map.get_chromosome_map(chrms) for chrms in chromID]
+    else:
+        gm_chr = [species.get_contig(chrms).recombination_map for chrms in chromID]
     snp_counter = 1
     genomat_list = []
     # add to map file for chroms

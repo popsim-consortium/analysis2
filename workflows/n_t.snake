@@ -484,12 +484,13 @@ rule gone_prep_inputs:
                                             chromIDs,
                                             chrom_annotation=wildcards.annots,
                                             )
+        genetic_map = None
+        if genetic_map_id is not None:
+            genetic_map = species.get_genetic_map(genetic_map_id)
+            if not genetic_map.is_cached():
+                genetic_map.download()
 
-        genetic_map = species.get_genetic_map(genetic_map_id)
-        if not genetic_map.is_cached():
-            genetic_map.download()
-
-        gone.ts2plink(inputs, output[0], output[1], wildcards.pops, genetic_map, chromIDs, mask_intervals=mask_intervals)
+        gone.ts2plink(inputs, output[0], output[1], species, wildcards.pops, genetic_map, chromIDs, mask_intervals=mask_intervals)
 
 
 rule gone_run:
@@ -557,7 +558,6 @@ rule clone_smcpp:
 rule ts_to_smc:
     input:
         output_dir + "/simulated_data/{demog}/{dfes}/{annots}/{seeds}/sim_{chrms}.trees",
-        rules.clone_smcpp.output
     output:
         output_dir + "/inference/{demog}/smcpp/{dfes}/{annots}/{seeds}/{pops}/sim_{chrms}.trees.smc.gz"
     run:
@@ -582,7 +582,6 @@ rule run_smcpp:
     input:
         expand(output_dir+ "/inference/{{demog}}/smcpp/{{dfes}}/{{annots}}/{{seeds}}/{{pops}}/sim_{chrms}.trees.smc.gz",
             chrms=chrm_list),
-        rules.clone_smcpp.output,
     output:
         output_dir + "/inference/{demog}/smcpp/{dfes}/{annots}/{seeds}/{pops}/model.final.json"
     threads: 20
