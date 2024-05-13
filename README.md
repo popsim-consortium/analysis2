@@ -36,6 +36,9 @@ by editing the following line in the `Snakefile` file
 configfile: "workflows/config/snakemake/tiny_config.yaml"
 ```
 
+The file can also be overridden by passing a different 
+yaml file via snakemake's `--configfile` flag.
+
 Having set the config file, and perhaps edited to your wishes,
 you are now ready to try a dry run.
 
