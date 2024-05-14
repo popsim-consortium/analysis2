@@ -64,28 +64,24 @@ rule simulation:
     run:
         if wildcards.demog == 'Constant': 
             model = stdpopsim.PiecewiseConstantSize(species.population_size)
-            mutation_rate = 1.29e-08 # where is this from?
-            #samples = model.get_samples(*demo_sample_size_dict[wildcards.demog])
+            mutation_rate = species.genome.mean_mutation_rate
         else: 
             model = species.get_demographic_model(wildcards.demog)
             mutation_rate = model.mutation_rate
-            #samples = model.get_samples(*demo_sample_size_dict[wildcards.demog])  # YRI, CEU, CHB
         samples = {f"{model.populations[i].name}": m for i, m in enumerate(demo_sample_size_dict[wildcards.demog])}
         genetic_map_id = config["genetic_map"]
         contig = species.get_contig(wildcards.chrms, genetic_map=genetic_map_id)
         if wildcards.dfes != "none":
             # Load dfe only if provided
             dfe = species.get_dfe(wildcards.dfes)
-        if wildcards.annots == "all_sites":
-            # Adding selection to the whole contig
-            contig.add_dfe(intervals=np.array([[0, int(contig.length)]]), DFE=dfe)
-        elif wildcards.annots == "none":
-            contig = species.get_contig(wildcards.chrms, genetic_map=genetic_map_id)
-        else:
-          ## Adding annotation only seletion on exon region
-            annot = species.get_annotations(wildcards.annots)
-            annot_intervals = annot.get_chromosome_annotations(wildcards.chrms)
-            contig.add_dfe(intervals=annot_intervals, DFE=dfe)
+            if wildcards.annots == "all_sites":
+                # Adding selection to the whole contig
+                contig.add_dfe(intervals=np.array([[0, int(contig.length)]]), DFE=dfe)
+            else:
+            ## Adding annotation only seletion on exon region
+                annot = species.get_annotations(wildcards.annots)
+                annot_intervals = annot.get_chromosome_annotations(wildcards.chrms)
+                contig.add_dfe(intervals=annot_intervals, DFE=dfe)
         
         contig.mutation_rate = mutation_rate
         engine = stdpopsim.get_engine("slim")
