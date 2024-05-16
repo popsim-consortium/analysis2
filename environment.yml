@@ -46,4 +46,5 @@ dependencies:
     - git+https://github.com/popgenmethods/smcpp
     - scikit-allel
     - git+https://github.com/xin-huang/dadi-cli
+    - git+https://github.com/kr-colab/diploSHIC.git@refs/pull/56/merge
     - diploSHIC

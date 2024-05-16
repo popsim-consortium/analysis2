@@ -413,7 +413,7 @@ def dump_results(input, output, params_dict, target_pops, num_subwins=1):
     if len(del_intervals) > 0:
         tss = tss.delete_intervals(del_intervals)
         tss = tss.trim()
-    tss.write_vcf(fh_vcf, position_transform = lambda x: np.fmax(1, np.round(x)))
+    tss.write_vcf(fh_vcf, position_transform = lambda x: 1 + np.round(x))
     fh_vcf.close()
     # write seqlen of shortened ts
     with open(output[2], 'w') as f:
@@ -559,7 +559,7 @@ rule boundary_sims:
     input:
     output:
         output_dir + "/simulated_data/sweeps/boundary_sims/sim_{seed}_{region_size}.trees"
-    resources: time=6000, mem_mb=6000
+    resources: time=60, mem_mb=6000
     run:
         model = species.get_demographic_model(demo_model["id"])
         mut_rate = model.mutation_rate 
@@ -588,7 +588,7 @@ rule neutral:
     input:
     output:
         output_dir + f"/simulated_data/sweeps/neutral/{demo_model['id']}/{{seed}}/sim_{chrom}_{{left}}_{{right}}.trees", 
-    resources: time=3000, mem_mb=8000
+    resources: time=30, mem_mb=7000
     run:
         model = species.get_demographic_model(demo_model["id"])
         mutation_rate = model.mutation_rate
@@ -620,7 +620,7 @@ rule bgs:
     input:
     output:
         output_dir + f"/simulated_data/sweeps/bgs/{demo_model['id']}/{{annot}}/{{dfe}}/{{seed}}/sim_{chrom}_{{left}}_{{right}}.trees", 
-    resources: time=3000, mem_mb=3000
+    resources: time=30, mem_mb=8000
     run:
         model = species.get_demographic_model(demo_model["id"])
         mutation_rate = model.mutation_rate
@@ -659,7 +659,7 @@ rule sweep:
     input:
     output:
         output_dir + f"/simulated_data/sweeps/sweep/{demo_model['id']}/{{popu}}/{{annot}}/{{dfe}}/{{coeff}}/{{tmult}}/{{seed}}/sim_{{chrom}}_{{left}}_{{right}}.trees", 
-    resources: time=3000, mem_mb=16000
+    resources: time=30, mem_mb=12000
     run:
         model = species.get_demographic_model(demo_model["id"])
         mutation_rate = model.mutation_rate
@@ -754,7 +754,7 @@ rule get_stats:
         output_dir + "/simulated_data/sweeps/{middle}/sim_{chrom}_{left}_{right}.diploshic.ancFile",
         output_dir + "/simulated_data/sweeps/{middle}/sim_{chrom}_{left}_{right}.diploshic.samples"
 
-    resources: time=3000, mem_mb=2000
+    resources: time=30, mem_mb=4000
     run:
         params_dict, target_pops = _get_params_dict_from_wildcards(wildcards)
         dump_results(input, output, params_dict, target_pops, config["num_subwins"])
@@ -769,7 +769,7 @@ rule diploshic_fvs:
 
     output:
         output_dir + '/simulated_data/sweeps/{middle}/sim_{chrom}_{left}_{right}_{popu}.diploshic.fv'
-    resources: time=30, mem_mb=1200
+    resources: time=40, mem_mb=5000
     run:
         with open(input[0],'r') as f:
             seq_len = f.read().strip()
@@ -783,7 +783,7 @@ rule diploshic_pred:
         rules.diploshic_train_classifier.output
     output:
         output_dir + '/simulated_data/sweeps/{middle}/sim_{chrom}_{left}_{right}_{popu}.diploshic.preds'
-    resources: time=30, mem_mb=1200
+    resources: time=30, mem_mb=3000
     run:
         cmd = f"export CUDA_VISIBLE_DEVICES=\"\" && diploSHIC predict trained_model.json trained_model.weights.hdf5 {input[0]} {output[0]}" 
         shell(cmd)   
@@ -820,7 +820,7 @@ rule merge_stats:
     input: stats_outs
     output:
         output_dir + f'/simulated_data/sweeps/all_sims.tmp.stats.tsv'
-    resources: time=3000, mem_mb=350000, disk_mb=350000
+    resources: time=1500, mem_mb=350000, disk_mb=350000
     run:
         #print(input, flush=True)
         #import pdb; pdb.set_trace()
@@ -830,7 +830,7 @@ rule merge_stats_shic1:
     input: shic_outs1
     output:
         output_dir + f'/simulated_data/sweeps/all_sims1.shic.stats.tsv'
-    resources: time=3000, mem_mb=150000, disk_mb=150000
+    resources: time=3000, mem_mb=350000, disk_mb=350000
     run:
         #print(input, flush=True)
         #import pdb; pdb.set_trace()
@@ -840,7 +840,7 @@ rule merge_stats_shic2:
     input: shic_outs2
     output:
         output_dir + f'/simulated_data/sweeps/all_sims2.shic.stats.tsv'
-    resources: time=3000, mem_mb=150000, disk_mb=150000
+    resources: time=3000, mem_mb=350000, disk_mb=350000
     run:
         #print(input, flush=True)
         #import pdb; pdb.set_trace()
@@ -850,7 +850,7 @@ rule merge_stats_shic3:
     input: shic_outs3
     output:
         output_dir + f'/simulated_data/sweeps/all_sims3.shic.stats.tsv'
-    resources: time=3000, mem_mb=150000, disk_mb=150000
+    resources: time=3000, mem_mb=350000, disk_mb=350000
     run:
         #print(input, flush=True)
         #import pdb; pdb.set_trace()
@@ -860,7 +860,7 @@ rule merge_stats_shic3:
 rule merge_all_stats:
     input: [output_dir + f'/simulated_data/sweeps/all_sims.tmp.stats.tsv', output_dir + f'/simulated_data/sweeps/all_sims3.shic.stats.tsv', output_dir + f'/simulated_data/sweeps/all_sims2.shic.stats.tsv', output_dir + f'/simulated_data/sweeps/all_sims1.shic.stats.tsv']
     output: output_dir + f'/simulated_data/sweeps/all_sims.stats.tsv'
-    resources: time=3000, mem_mb=150000, disk_mb=150000
+    resources: time=3000, mem_mb=350000, disk_mb=350000
     shell:
        "cat {input} > {output}"
 

@@ -8,17 +8,16 @@ cluster:
                 --time={resources.time}
                 --job-name=smk-{rule}%j
                 --output=logs/{rule}/{rule}%j.out
+                --parsable
 default-resources:
         - time=60
         - mem_mb=12000
         - threads=1
+cluster-status: "status-sacct.sh" 
 restart-times: 3
-max-jobs-per-second: 10
-max-status-checks-per-second: 1
-local-cores: 1
-latency-wait: 60
-jobs: 500
-keep-going: True
+max-jobs-per-second: 1000
+max-status-checks-per-second: 1000
+jobs: 2000
 rerun-incomplete: True
 printshellcmds: True
 scheduler: greedy
