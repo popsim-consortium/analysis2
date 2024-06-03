@@ -62,7 +62,7 @@ rule all:
         expand("{tDir}/neut_0.fvec", tDir = ["train", "test"]),
         expand("trainingSets/{cl}.fvec", cl = ["hard", "linkedHard", "soft", "linkedSoft", "neut"]),
         "trained_model.json",
-        "trained_model.weights.hdf5"
+        "trained_model.weights.h5"
 
 rule clone_discoal:
     output:
@@ -156,7 +156,7 @@ rule train_classifier:
         rules.make_training_sets.output
     output:
         "trained_model.json",
-        "trained_model.weights.hdf5"
+        "trained_model.weights.h5"
     run:
         # cpu training below
         cmd = f"export CUDA_VISIBLE_DEVICES=\"\" && {diploSHIC_exec} train trainingSets/ trainingSets/ trained_model --epochs=100"

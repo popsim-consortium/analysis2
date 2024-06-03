@@ -413,6 +413,10 @@ def dump_results(input, output, params_dict, target_pops, num_subwins=1):
     if len(del_intervals) > 0:
         tss = tss.delete_intervals(del_intervals)
         tss = tss.trim()
+    # because we are shifting from 0-based to 1-based, I need to remove any sites that may have happened at the last position
+    sites_at_last = np.where(np.round(tss.sites_position)==config["focal_size"])[0]
+    assert sites_at_last.shape[0] < 4 # realistically we shouldn't get more than two or three hits there
+    tss = tss.delete_sites(sites_at_last)
     tss.write_vcf(fh_vcf, position_transform = lambda x: 1 + np.round(x))
     fh_vcf.close()
     # write seqlen of shortened ts
@@ -538,7 +542,7 @@ shic_outs3 = [file_prefix+".stats.tsv.shic" for file_prefix in sw_outs_prefix_po
 
 rule all:
     input:
-        rules.diploshic_all.input,
+        rules.diploshic_all.input, 
         boundary_outs + trees_outs + stats_outs + vcf_outs + [output_dir + f'/simulated_data/sweeps/all_sims.stats.tsv', output_dir+f'/simulated_data/sweeps/rec_map_{chrom}_{config["num_windows"]}.tsv'] + annot_outs +anc_outs + fv_outs + pred_outs + shic_outs1 + shic_outs2 + shic_outs3
     default_target: True
 
@@ -785,7 +789,7 @@ rule diploshic_pred:
         output_dir + '/simulated_data/sweeps/{middle}/sim_{chrom}_{left}_{right}_{popu}.diploshic.preds'
     resources: time=30, mem_mb=3000
     run:
-        cmd = f"export CUDA_VISIBLE_DEVICES=\"\" && diploSHIC predict trained_model.json trained_model.weights.hdf5 {input[0]} {output[0]}" 
+        cmd = f"export CUDA_VISIBLE_DEVICES=\"\" && diploSHIC predict trained_model.json trained_model.weights.h5 {input[0]} {output[0]}" 
         shell(cmd)   
 
 

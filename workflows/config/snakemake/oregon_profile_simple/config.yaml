@@ -17,9 +17,10 @@ cluster-status: "status-sacct.sh"
 restart-times: 3
 max-jobs-per-second: 1000
 max-status-checks-per-second: 1000
-jobs: 2000
+jobs: 3500
 rerun-incomplete: True
 printshellcmds: True
+latency-wait: 30
 scheduler: greedy
 use-conda: True
 jobscript: "jobscript-wo-properties.sh"
