@@ -1,6 +1,6 @@
 # General configs
 seed: 12345
-replicates: 200
+replicates: 1_000
 output_dir: results
 
 # Contig configs
