@@ -158,6 +158,8 @@ rule dadi_infer_dfe:
         ratio = 2.31,
         opts = 100,
         prefix = output_dir + "/inference/{demog}/dadi/{dfes}/{annots}/{seeds}/pop{ids}/pop{ids}.two_epoch.gamma"
+    resources:
+        time=2000
     threads: 8
     shell:
         """

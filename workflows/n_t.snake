@@ -345,7 +345,7 @@ rule run_msmc:
         output_dir + "/inference/{demog}/msmc/{dfes}/{annots}/{seeds}/{pops}/{samps}.trees.multihep.txt.final.txt"
     threads: 8
     resources:
-        mem_mb=24000
+        mem_mb=48000
     run:
         inputs = expand(output_dir + "/inference/{demog}/msmc/{dfes}/{annots}/{seeds}/{pops}/{chrms}.trees.multihep.txt",
                     demog=wildcards.demog,
@@ -500,7 +500,7 @@ rule gone_run:
     output:
         output_dir + "/inference/{demog}/gone/{dfes}/{annots}/{seeds}/{pops}/gone_estimated_Ne.txt",
     threads: 8
-    resources: time=180
+    resources: time=360
     shell:
         """
         cwd=$PWD

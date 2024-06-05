@@ -1,7 +1,7 @@
 # snakemake settings
 "seed": 12345
 "replicates": 3
-"output_dir": "results"
+"output_dir": "PhoSin_results"
 
 # species-specific settings
 "species": "PhoSin"
