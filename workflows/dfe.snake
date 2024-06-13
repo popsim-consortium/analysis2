@@ -159,11 +159,11 @@ rule dadi_infer_dfe:
         opts = 100,
         prefix = output_dir + "/inference/{demog}/dadi/{dfes}/{annots}/{seeds}/pop{ids}/pop{ids}.two_epoch.gamma"
     resources:
-        time=2000
+        time=4000
     threads: 8
     shell:
         """
-        dadi-cli InferDFE --fs {input[0]} --cache1d {input[1]} --demo-popt {input[2]} --output-prefix {params.prefix} --pdf1d {params.dfe} --p0 {params.dfe_p0} --ubounds {params.dfe_ubounds} --lbounds {params.dfe_lbounds} --ratio {params.ratio} --optimizations {params.opts} --cpus {threads} --nomisid --force-convergence 1
+        dadi-cli InferDFE --fs {input[0]} --cache1d {input[1]} --demo-popt {input[2]} --output-prefix {params.prefix} --pdf1d {params.dfe} --p0 {params.dfe_p0} --ubounds {params.dfe_ubounds} --lbounds {params.dfe_lbounds} --ratio {params.ratio} --optimizations {params.opts} --cpus {threads} --nomisid --force-convergence 0
 
         """
 
@@ -437,7 +437,7 @@ rule plot_results:
 
         if wildcards.demog == 'Constant': 
             model = stdpopsim.PiecewiseConstantSize(species.population_size)
-            mutation_rate = 1.29e-08
+            mutation_rate = species.genome.mean_mutation_rate
 
             dadi_bestfits = [ b for b in dadi_bestfits if 'pop0' in b ]
             polydfe_bestfits = [ b for b in polydfe_bestfits if 'pop0' in b ]
@@ -446,6 +446,8 @@ rule plot_results:
         else: 
             model = species.get_demographic_model(wildcards.demog)
             mutation_rate = model.mutation_rate
+            if mutation_rate is None:
+                mutation_rate = species.genome.mean_mutation_rate
 
         pop_names = [ model.populations[i].name for i in range(len(model.populations)) ]
         plots.plot_all_dfe_results([dadi_bestfits, polydfe_bestfits, dfe_alpha_bestfits, grapes_bestfits], output, mutation_rate, seq_len, 0.7, pop_names)

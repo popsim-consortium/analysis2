@@ -60,7 +60,9 @@ rule simulation:
     input:
     output:
         output_dir + "/simulated_data/{demog}/{dfes}/{annots}/{seeds}/sim_{chrms}.trees"
-    resources: time=3000, mem_mb=10000
+    resources: 
+        time = lambda wildcards, attempt: attempt * 3000, 
+        mem_mb = lambda wildcards, attempt: attempt * 50000
     run:
         if wildcards.demog == 'Constant': 
             model = stdpopsim.PiecewiseConstantSize(species.population_size)
@@ -68,6 +70,9 @@ rule simulation:
         else: 
             model = species.get_demographic_model(wildcards.demog)
             mutation_rate = model.mutation_rate
+            if mutation_rate is None:
+                mutation_rate = species.genome.mean_mutation_rate
+
         samples = {f"{model.populations[i].name}": m for i, m in enumerate(demo_sample_size_dict[wildcards.demog])}
         genetic_map_id = config["genetic_map"]
         contig = species.get_contig(wildcards.chrms, genetic_map=genetic_map_id)
