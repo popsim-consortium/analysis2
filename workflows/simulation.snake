@@ -61,8 +61,8 @@ rule simulation:
     output:
         output_dir + "/simulated_data/{demog}/{dfes}/{annots}/{seeds}/sim_{chrms}.trees"
     resources: 
-        time = lambda wildcards, attempt: attempt * 3000, 
-        mem_mb = lambda wildcards, attempt: attempt * 50000
+        time = lambda wildcards, attempt: attempt * 6000, 
+        mem_mb = lambda wildcards, attempt: attempt * 100000
     run:
         if wildcards.demog == 'Constant': 
             model = stdpopsim.PiecewiseConstantSize(species.population_size)
