@@ -220,7 +220,7 @@ rule run_stairwayplot:
         output_dir + "/inference/{demog}/stairwayplot/{dfes}/{annots}/{seeds}/{pops}/stairwayplot_estimated_Ne.txt"
     threads: 20
     resources:
-        time = 1_000,
+        time = 2_000,
         mem_mb=120_000,
     run:
         inputs = expand(
@@ -317,7 +317,8 @@ rule ts_to_multihep:
         output_dir + "/simulated_data/{demog}/{dfes}/{annots}/{seeds}/sim_{chrms}.trees"
     output:
         output_dir + "/inference/{demog}/msmc/{dfes}/{annots}/{seeds}/{pops}/{chrms}.trees.multihep.txt"
-
+    resources:
+        time=2_000,
     run:
         print(input[0], num_sampled_genomes_msmc, mask_file)
         if wildcards.annots == "none" or msmc_mask == "none":
