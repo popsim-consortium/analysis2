@@ -1,7 +1,7 @@
 # snakemake settings
 "seed": 12345
 "replicates": 3
-"output_dir": "results"
+"output_dir": "HomSap_results"
 
 # species-specific settings
 "species": "HomSap"
@@ -10,32 +10,32 @@
     "num_samples_per_population": [100],
     },
     {"id":"OutOfAfricaArchaicAdmixture_5R19",
-    "num_samples_per_population": 3*[100],
+    "num_samples_per_population": [100, 100, 100],
     }
 ]
 "genetic_map": "HapMapII_GRCh38"
-"chrm_list": "chr1, chr2, chr3, chr4, chr5, chr6, chr7, chr8, chr9, chr10, chr11, chr12, chr13, chr14, chr15, chr16, chr17, chr18, chr19, chr20, chr21, chr22"
+"chrm_list": "chr1,chr2,chr3,chr4,chr5,chr6,chr7,chr8,chr9,chr10,chr11,chr12,chr13,chr14,chr15,chr16,chr17,chr18,chr19,chr20,chr21,chr22"
 "dfe_list": ["none", "Gamma_K17"]
 "annotation_list": ["all_sites", "ensembl_havana_104_exons", "ensembl_havana_104_exons"]
 "mask_file": "workflows/masks/HapmapII_GRCh38.mask.bed"
 "stairway_annot_mask" : "" # set this or any of the below to 'none' to skip annot masking
-"msmc_annot_mask" : ""
-"gone_annot_mask" : ""
-"smcpp_annot_mask" : ""
+"msmc_annot_mask": ""
+"gone_annot_mask": ""
+"smcpp_annot_mask": ""
 
 # slim settings
 "slim_scaling_factor": 1
 "slim_burn_in": 10
 
 # n(t) specific configs
-"methods" : ["stairwayplot", "gone", "smcpp", "msmc"]
-"num_sampled_genomes_msmc" : [6]
-"num_msmc_iterations" : 20
-"gone_phase" : 1  # 0 for pseudohaploid, 1 for phased, 2 for unknown phase
-"gone_max_snps" : 50000  # default=50000
-"gone_threads" : 8
-"gone_num_gens" : 2000  # default=2000
-"gone_num_bins" : 400  # default=400
+"methods": ["stairwayplot", "gone", "smcpp", "msmc"]
+"num_sampled_genomes_msmc": [6]
+"num_msmc_iterations": 20
+"gone_phase": 1  # 0 for pseudohaploid, 1 for phased, 2 for unknown phase
+"gone_max_snps": 50000  # default=50000
+"gone_threads": 8
+"gone_num_gens": 2000  # default=2000
+"gone_num_bins": 400  # default=400
 
 
 # exe paths
@@ -44,6 +44,6 @@
 "dfe_alpha_data_path_1": "ext/dfe-alpha-release-2.16/data"
 "dfe_alpha_data_path_2": "three-epoch"
 "grapes_exec": "ext/grapes/multi_grapes"
-"msmc_exec" : "ext/msmc2/build/release/msmc2"
-"stairwayplot_code" : "ext/stairwayplot/swarmops.jar"
-"gone_code" : "ext/GONE/Linux"
+"msmc_exec": "ext/msmc2/build/release/msmc2"
+"stairwayplot_code": "ext/stairwayplot/swarmops.jar"
+"gone_code": "ext/GONE/Linux"

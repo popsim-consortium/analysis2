@@ -80,13 +80,18 @@ def run_msmc_estimate(input_files, output_file, num_genomes, msmc_exec_loc, tota
     The final estimates will be written to
     input_file.final.txt
     """
+
+    #check that there are snps in the input or msmc2 will crash with an unhelpful error
+    input_list = input_files.split(" ")
+    non_emtpy_input_files = " ".join([file for file in input_list if os.path.getsize(file) > 0])
+    if non_emtpy_input_files == "":
+        raise ValueError("All input files are empty")
     num_genomes = int(num_genomes)
     assert num_genomes < total_samples * 2
     subset = np.random.choice(range(total_samples*2), num_genomes, replace=False)
     haplotypes = ",".join(map(str, sorted(subset)))
-    cmd = (f"{msmc_exec_loc} -r 0.25 -I {haplotypes} -i {iterations} -o {output_file}{num_genomes}.trees.multihep.txt -t {ncores} {input_files}")
+    cmd = (f"{msmc_exec_loc} -r 0.25 -I {haplotypes} -i {iterations} -o {output_file}{num_genomes}.trees.multihep.txt -t {ncores} {non_emtpy_input_files}")
     subprocess.run(cmd, shell=True, check=True)
-
 
 def convert_msmc_output(results_file, outfile, mutation_rate, generation_time):
     """

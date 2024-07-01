@@ -44,8 +44,12 @@ def get_mask_from_chrom_annotation(speciesID, chrom_annotation, chromID):
     :chromID: chromosome ID (e.g., "chr1")
     """
     species = stdpopsim.get_species(speciesID)
-    a = species.get_annotations(chrom_annotation)
-    mask = [a.get_chromosome_annotations(chrom) for chrom in chromID]
+    if chrom_annotation in [s.id for s in species.annotations]:
+        a = species.get_annotations(chrom_annotation)
+        mask = [a.get_chromosome_annotations(chrom) for chrom in chromID]        
+    else:
+        #if annotation is anything but a stdpopsim annotation, don't mask anything
+        mask = np.array([], dtype=int).reshape(0, 2)
     return mask
 
 
@@ -107,7 +111,7 @@ def get_combined_masks(species, mask_file, chromID, chrom_annotation=None):
     else:
         mask = np.array([], dtype=int).reshape(0, 2)
     # get annotations for chrom
-    if chrom_annotation is not None:
+    if chrom_annotation in [s.id for s in stdpopsim.get_species(species).annotations]:
         an_mask = get_mask_from_chrom_annotation(species, chrom_annotation, chromID)
         mask = [np.concatenate((m, am)) for m, am in zip(mask, an_mask)]
     # merge overlapping and adjacent intervals
