@@ -220,7 +220,7 @@ rule run_stairwayplot:
         output_dir + "/inference/{demog}/stairwayplot/{dfes}/{annots}/{seeds}/{pops}/stairwayplot_estimated_Ne.txt"
     threads: 20
     resources:
-        time = 2_000,
+        time = 3_000,
         mem_mb=120_000,
     run:
         inputs = expand(
