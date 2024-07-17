@@ -26,6 +26,9 @@ np.random.seed(config["seed"])
 # The number of replicates of each analysis you would like to run
 replicates = config["replicates"]
 
+#workflow path in case it's not the current directory
+workflow_path = config.get("workflow_path", "./")
+
 # Where you would like all output files from analysis to live
 output_dir = os.path.abspath(config["output_dir"])
 
@@ -224,10 +227,11 @@ rule run_polydfe:
     output: 
         output_dir + "/inference/{demog}/polyDFE/{dfes}/{annots}/{seeds}/pop{ids}/pop{ids}.polyDFE.out"
     params:
-        exec=poly_dfe_exec
+        exec=poly_dfe_exec,
+        workflow_path = workflow_path
     shell:
         """
-        '{params.exec}' -d {input} -m C -i workflows/config/polyDFE/polyDFE_init_models.txt 1 -e > {output[0]}
+        '{params.exec}' -d {input} -m C -i {params.workflow_path}/config/polyDFE/polyDFE_init_models.txt 1 -e > {output[0]}
         """
 
 rule get_polydfe_bestfit:

@@ -2,6 +2,7 @@
 "seed": 12345
 "replicates": 3
 "output_dir": "PhoSin_results"
+"workflow_path": "workflows/"
 
 # species-specific settings
 "species": "PhoSin"
@@ -43,3 +44,4 @@
 "msmc_exec": "ext/msmc2/build/release/msmc2"
 "stairwayplot_code": "ext/stairwayplot/swarmops.jar"
 "gone_code": "ext/GONE/Linux"
+
