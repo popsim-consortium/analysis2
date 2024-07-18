@@ -10,8 +10,12 @@ import ts2fs
 import plots
 import masks
 
-configfile: "workflows/config/snakemake/tiny_config.yaml"
+#quick fix for excluding "Constant" with "pop1" and "pop2" from the analysis
+def drop_constant_populations(paths):
+    return [path for path in paths if not ("Constant" in path and ("pop1" in path or "pop2" in path))]
 
+
+configfile: "workflows/config/snakemake/tiny_config.yaml"
 
 np.random.seed(config["seed"])
 
@@ -21,6 +25,9 @@ np.random.seed(config["seed"])
 
 # The number of replicates of each analysis you would like to run
 replicates = config["replicates"]
+
+#workflow path in case it's not the current directory
+workflow_path = config.get("workflow_path", "./")
 
 # Where you would like all output files from analysis to live
 output_dir = os.path.abspath(config["output_dir"])
@@ -72,7 +79,6 @@ annotation_dict = dict.fromkeys(config["annotation_list"])
 if "none" in annotation_dict:
     del annotation_dict["none"]
 annotation_list = list(annotation_dict)
-
 
 rule all:
     input: 
@@ -158,11 +164,12 @@ rule dadi_infer_dfe:
         ratio = 2.31,
         opts = 100,
         prefix = output_dir + "/inference/{demog}/dadi/{dfes}/{annots}/{seeds}/pop{ids}/pop{ids}.two_epoch.gamma"
+    resources:
+        time=4000
     threads: 8
     shell:
         """
         dadi-cli InferDFE --fs {input[0]} --cache1d {input[1]} --demo-popt {input[2]} --output-prefix {params.prefix} --pdf1d {params.dfe} --p0 {params.dfe_p0} --ubounds {params.dfe_ubounds} --lbounds {params.dfe_lbounds} --ratio {params.ratio} --optimizations {params.opts} --cpus {threads} --nomisid --force-convergence 1
-
         """
 
 rule get_dadi_dfe_bestfits:
@@ -220,10 +227,11 @@ rule run_polydfe:
     output: 
         output_dir + "/inference/{demog}/polyDFE/{dfes}/{annots}/{seeds}/pop{ids}/pop{ids}.polyDFE.out"
     params:
-        exec=poly_dfe_exec
+        exec=poly_dfe_exec,
+        workflow_path = workflow_path
     shell:
         """
-        '{params.exec}' -d {input} -m C -i workflows/config/polyDFE/polyDFE_init_models.txt 1 -e > {output[0]}
+        '{params.exec}' -d {input} -m C -i {params.workflow_path}/config/polyDFE/polyDFE_init_models.txt 1 -e > {output[0]}
         """
 
 rule get_polydfe_bestfit:
@@ -382,34 +390,34 @@ rule get_grapes_bestfits:
 
 rule plot_results:
     input:
-        dadi_res = expand(output_dir + "/inference/{demog}/dadi/{dfes}/{annots}/{seeds}/pop{ids}/pop{ids}.dadi.bestfit", 
+        dadi_res = drop_constant_populations(expand(output_dir + "/inference/{demog}/dadi/{dfes}/{annots}/{seeds}/pop{ids}/pop{ids}.dadi.bestfit", 
             demog=demo_model_id_list,
             seeds=seed_list,
             dfes=dfe_list,
             annots=annotation_list,
             ids=pids,
-        ),
-        polydfe_res = expand(output_dir + "/inference/{demog}/polyDFE/{dfes}/{annots}/{seeds}/pop{ids}/pop{ids}.polyDFE.bestfit",
+        )),
+        polydfe_res = drop_constant_populations(expand(output_dir + "/inference/{demog}/polyDFE/{dfes}/{annots}/{seeds}/pop{ids}/pop{ids}.polyDFE.bestfit",
             demog=demo_model_id_list,
             seeds=seed_list,
             dfes=dfe_list,
             annots=annotation_list,
             ids=pids,
-        ),
-        dfe_alpha_res = expand(output_dir + "/inference/{demog}/DFE-alpha/{dfes}/{annots}/{seeds}/pop{ids}/pop{ids}.DFE-alpha.bestfit",
+        )),
+        dfe_alpha_res = drop_constant_populations(expand(output_dir + "/inference/{demog}/DFE-alpha/{dfes}/{annots}/{seeds}/pop{ids}/pop{ids}.DFE-alpha.bestfit",
             demog=demo_model_id_list,
             seeds=seed_list,
             dfes=dfe_list,
             annots=annotation_list,
             ids=pids,
-        ),
-        grapes_res = expand(output_dir + "/inference/{demog}/grapes/{dfes}/{annots}/{seeds}/pop{ids}/pop{ids}.grapes.bestfit",
+        )),
+        grapes_res = drop_constant_populations(expand(output_dir + "/inference/{demog}/grapes/{dfes}/{annots}/{seeds}/pop{ids}/pop{ids}.grapes.bestfit",
             demog=demo_model_id_list,
             seeds=seed_list,
             dfes=dfe_list,
             annots=annotation_list,
             ids=pids,
-        )
+        ))
     output:
         output_dir + "/plots/{demog}/{dfes}/{annots}/dfe.inference.benchmark.pdf"
     run:
@@ -435,7 +443,7 @@ rule plot_results:
 
         if wildcards.demog == 'Constant': 
             model = stdpopsim.PiecewiseConstantSize(species.population_size)
-            mutation_rate = 1.29e-08
+            mutation_rate = species.genome.mean_mutation_rate
 
             dadi_bestfits = [ b for b in dadi_bestfits if 'pop0' in b ]
             polydfe_bestfits = [ b for b in polydfe_bestfits if 'pop0' in b ]
@@ -444,6 +452,8 @@ rule plot_results:
         else: 
             model = species.get_demographic_model(wildcards.demog)
             mutation_rate = model.mutation_rate
+            if mutation_rate is None:
+                mutation_rate = species.genome.mean_mutation_rate
 
         pop_names = [ model.populations[i].name for i in range(len(model.populations)) ]
         plots.plot_all_dfe_results([dadi_bestfits, polydfe_bestfits, dfe_alpha_bestfits, grapes_bestfits], output, mutation_rate, seq_len, 0.7, pop_names)

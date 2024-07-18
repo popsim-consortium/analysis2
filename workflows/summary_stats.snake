@@ -191,9 +191,11 @@ rule gather_diploshic_fvs:
             )  
     output:
         output_dir + "/summaries/{demog}/{dfes}/{annots}/{seeds}/sim_{chrms}.{popid}.diploshic.stats",
+    params:
+        output_dir = output_dir
     shell:
         """
-        cat results/summaries/{wildcards.demog}/{wildcards.dfes}/{wildcards.annots}/{wildcards.seeds}/sim_{wildcards.chrms}.{wildcards.popid}.*.diploshic.stats | sort -nk 2 | uniq >> {output}
+        cat {params.output_dir}/summaries/{wildcards.demog}/{wildcards.dfes}/{wildcards.annots}/{wildcards.seeds}/sim_{wildcards.chrms}.{wildcards.popid}.*.diploshic.stats | sort -nk 2 | uniq >> {output}
         """
 
 rule plot_pi_individual:
