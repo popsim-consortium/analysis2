@@ -62,7 +62,7 @@ rule all:
         expand("{tDir}/neut_0.fvec", tDir = ["train", "test"]),
         expand("trainingSets/{cl}.fvec", cl = ["hard", "linkedHard", "soft", "linkedSoft", "neut"]),
         "trained_model.json",
-        "trained_model.weights.hdf5"
+        "trained_model.weights.h5"
 
 rule clone_discoal:
     output:
@@ -74,6 +74,7 @@ rule clone_discoal:
         cd ext/
         git clone https://github.com/kr-colab/discoal.git
         cd discoal/
+        sed -i -e 's/SITES 220020/SITES 1100100/' discoal.h
         make discoal
         cd ..
         """
@@ -84,6 +85,7 @@ rule discoal_neutral_simulation:
         discoal_exec
     output:
         "{tDir}/discoal.neut.{i}.out"
+    resources: time=6000, mem_mb=256000
     shell:
         neutString + " > {output}"
 
@@ -94,6 +96,7 @@ rule discoal_hard_simulation:
         discoal_exec
     output:
         "{tDir}/discoal.hard.{x}.{i}.out"
+    resources: time=6000, mem_mb=256000
     run:
         cmd = selStr + " -x "+str(sweep_locs[int(wildcards.x)])+" > {output}"
         shell(cmd)
@@ -104,6 +107,7 @@ rule discoal_soft_simulation:
         discoal_exec
     output:
         "{tDir}/discoal.soft.{x}.{i}.out"
+    resources: time=6000, mem_mb=256000
     run:
         cmd = selStr + softStr + " -x "+str(sweep_locs[int(wildcards.x)])+" > {output}"
         shell(cmd)
@@ -126,14 +130,17 @@ rule concat_fvecs:
     run:
         for t in ["train", "test"]:
             cmd = "cat {t}/discoal.neut.0.0.out.fvec > {t}/neut_0.fvec"
+            shell(cmd)
             for ii in range(1, totSimRuns):
-                cmd += f" && tail -n +2 {t}/discoal.neut.0.{ii}.out.fvec >> {t}/neut_0.fvec"
+                cmd = f"tail -n +2 {t}/discoal.neut.0.{ii}.out.fvec >> {t}/neut_0.fvec"
+                shell(cmd)
             for model in ["hard", "soft"]:
                 for xx in range(11):
-                    cmd += f" && cat {t}/discoal.{model}.{xx}.0.out.fvec > {t}/{model}_{xx}.fvec"
-                    for i in range(1,totSimRuns):
-                        cmd += f" && tail -n +2 {t}/discoal.{model}.{xx}.{ii}.out.fvec >> {t}/{model}_{xx}.fvec"
-            shell(cmd)
+                    cmd = f"cat {t}/discoal.{model}.{xx}.0.out.fvec > {t}/{model}_{xx}.fvec"
+                    shell(cmd)
+                    for ii in range(1,totSimRuns):
+                        cmd = f"tail -n +2 {t}/discoal.{model}.{xx}.{ii}.out.fvec >> {t}/{model}_{xx}.fvec"
+                        shell(cmd)
 
 rule make_training_sets:
     input:
@@ -149,13 +156,13 @@ rule train_classifier:
         rules.make_training_sets.output
     output:
         "trained_model.json",
-        "trained_model.weights.hdf5"
+        "trained_model.weights.h5"
     run:
         # cpu training below
         cmd = f"export CUDA_VISIBLE_DEVICES=\"\" && {diploSHIC_exec} train trainingSets/ trainingSets/ trained_model --epochs=100"
         shell(cmd)
 
-rule clean:
-    shell:
-        "rm -rf test/ train/ trained_model* \
-            .snakemake slurm*"
+#rule clean:
+#    shell:
+#        "rm -rf test/ train/ trained_model* \
+#            .snakemake slurm*"
