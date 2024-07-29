@@ -165,7 +165,7 @@ rule dadi_infer_dfe:
         opts = 100,
         prefix = output_dir + "/inference/{demog}/dadi/{dfes}/{annots}/{seeds}/pop{ids}/pop{ids}.two_epoch.gamma"
     resources:
-        time=4000
+        time=10080
     threads: 8
     shell:
         """
@@ -290,7 +290,7 @@ rule generate_dfe_alpha_fs:
             ts_dict[chrm] = fp
         index = int(wildcards.ids)
         ts2fs.generate_fs(ts_dict, index, mask_file, wildcards.annots,
-                  species, output, format='DFE-alpha', is_folded=True,
+                  species, output, format='DFE-alpha', is_folded=False,
                   data_path_1=dfe_alpha_data_path_1, data_path_2=dfe_alpha_data_path_2,
                   sfs_input_file=output[2], est_dfe_results_dir=params.output,
                   est_dfe_demography_results_file=params.output+"/neu/est_dfe.out")
