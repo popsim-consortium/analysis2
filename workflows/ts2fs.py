@@ -271,7 +271,6 @@ def _generate_dfe_alpha_fs(neu_fs, nonneu_fs, output, is_folded, **kwargs):
     Arguments:
         neu_fs numpy.ndarray: Frequency spectrum for neutral mutations.
         nonneu_fs numpy.ndarray: Frequency spectrum for non-neutral mutations.
-        seq_len int: Length of the genomic sequence generates mutations.
         output list: Names of output files.
         is_folded bool: True, generates a folded frequency spectrum; False, generates an unfolded frequency spectrum.
     
