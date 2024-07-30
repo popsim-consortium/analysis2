@@ -43,7 +43,7 @@ def get_expected_netural_subs(ts, mutation_rate):
             if mtypes['is_neutral']:
                 annot_intervals = np.array(dfe['intervals'])
                 if annot_intervals.shape[0] == 0:
-                    np.array([[0, sequence_length]])
+                    annot_intervals = np.array([[0, sequence_length]])
                 #assumes netural is first proportion in list
                 proportion = dfe['proportions'][0]
                 ratemap = mask_to_ratemap(annot_intervals, sequence_length, mutation_rate, proportion)
