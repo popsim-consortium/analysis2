@@ -1,9 +1,9 @@
 import dadi
 import numpy as np
+from numpy.random import default_rng
 import tskit
 import masks
 import msprime
-
 
 def mask_to_ratemap(annot_intervals, sequence_length, mutation_rate, proportion):
     """
@@ -52,8 +52,6 @@ def get_expected_netural_subs(ts, mutation_rate):
                                                 (ratemap.get_cumulative_mass(t.interval.right) -
                                                  ratemap.get_cumulative_mass(t.interval.left)))
     return int(exp_neutral_subs)
-
-
 
 def _generate_fs_from_ts(ts_dict, pop_idx, mask_file, annot, species, max_haplos):
     """
@@ -113,7 +111,7 @@ def _generate_fs_from_ts(ts_dict, pop_idx, mask_file, annot, species, max_haplos
 
         # Get count of substitutions for neutral SFS 
         mutation_rate = species.genome.mean_mutation_rate
-        total_neutral_subs+= get_expected_netural_subs(ts, mutation_rate)
+        total_neutral_subs += get_expected_netural_subs(ts, mutation_rate)
 
         # Mapping mutation type IDs to class of mutation (e.g., neutral, non-neutral)
         mut_types = {}
@@ -149,14 +147,23 @@ def _generate_fs_from_ts(ts_dict, pop_idx, mask_file, annot, species, max_haplos
     mut_afs["neutral"] = np.array(mut_afs["neutral"])
     mut_afs["non_neutral"] = np.array(mut_afs["non_neutral"])
     mut_afs["neutral"] = np.sum(mut_afs["neutral"], axis=0)
-    #add neutral subs to last bin
-    mut_afs["neutral"][-1] = total_neutral_subs
     mut_afs["non_neutral"] = np.sum(mut_afs["non_neutral"], axis=0)
 
+    #random draw of neutral subs from expected
+    rng = default_rng(42)
+    neutral_subs_draw = rng.poisson(total_neutral_subs)
+
+    #add neutral subs to last bin 
+    mut_afs["neutral"][-1] = neutral_subs_draw
+    
     #add in ancestral counts
     mut_afs["neutral"][0] = neutral_anc_count
     mut_afs["non_neutral"][0] = non_neutral_anc_count
     
+    # Remove mutated sites from first bin
+    mut_afs["neutral"][0] = mut_afs["neutral"][0] - sum(mut_afs["neutral"][1:])
+    mut_afs["non_neutral"][0] = mut_afs["non_neutral"][0] - sum(mut_afs["non_neutral"][1:])
+
     print(f"AFSs\nNeutral: {mut_afs['neutral']}\nNon-neutral: {mut_afs['non_neutral']}")
     return mut_afs,seq_len,len(sample_sets)
 
@@ -188,7 +195,7 @@ def generate_fs(ts_dict, pop_idx, mask_file, annot, species, output, format, max
 
     if format == 'dadi': _generate_dadi_fs(neu_fs, nonneu_fs, output)
     elif format == 'polyDFE': _generate_polydfe_fs(neu_fs, nonneu_fs, output, seq_len, sample_size, **kwargs)
-    elif format == 'DFE-alpha': _generate_dfe_alpha_fs(neu_fs, nonneu_fs, seq_len, output, is_folded, **kwargs)
+    elif format == 'DFE-alpha': _generate_dfe_alpha_fs(neu_fs, nonneu_fs, output, is_folded, **kwargs)
     elif format == 'grapes': _generate_grapes_fs(neu_fs, nonneu_fs, output, is_folded, seq_len, sample_size, **kwargs)
 
     else: raise Exception(f'{format} is not supported!')
@@ -254,7 +261,7 @@ def _generate_polydfe_fs(neu_fs, nonneu_fs, output, seq_len, sample_size, **kwar
         o.write(" ".join([str(round(f)) for f in nonneu_fs[1:-1]]) + " " + str(nonneu_len) + "\n")
 
 
-def _generate_dfe_alpha_fs(neu_fs, nonneu_fs, seq_len, output, is_folded, **kwargs):
+def _generate_dfe_alpha_fs(neu_fs, nonneu_fs, output, is_folded, **kwargs):
     """
     Description:
         Outputs frequency spectra for DFE-alpha.
@@ -325,11 +332,11 @@ def _generate_dfe_alpha_fs(neu_fs, nonneu_fs, seq_len, output, is_folded, **kwar
 
     if is_folded:
        if len(neu_fs) % 2 == 1: upper_half = np.zeros(len(neu_fs))
-       else: upper_half = np.zeros(len(neu_fs)-1) 
+       else: upper_half = np.zeros(len(neu_fs)-1)
        neu_fs = np.append(neu_fs, upper_half)
 
        if len(nonneu_fs) % 2 == 1: upper_half = np.zeros(len(nonneu_fs))
-       else: upper_half = np.zeros(len(nonneu_fs)-1) 
+       else: upper_half = np.zeros(len(nonneu_fs)-1)
        nonneu_fs = np.append(nonneu_fs, upper_half)
 
     with open(neu_config_out, 'w') as o:
@@ -341,7 +348,6 @@ def _generate_dfe_alpha_fs(neu_fs, nonneu_fs, seq_len, output, is_folded, **kwar
         o.write(str(len(neu_fs)-1)+"\n")
         o.write(" ".join([str(round(f)) for f in nonneu_fs]) + "\n")
         o.write(" ".join([str(round(f)) for f in neu_fs]) + "\n")
-
 
 def _generate_grapes_fs(neu_fs, nonneu_fs, output, is_folded, seq_len, sample_size, **kwargs):
     """
@@ -363,9 +369,9 @@ def _generate_grapes_fs(neu_fs, nonneu_fs, output, is_folded, seq_len, sample_si
         nonneu_prop float: Proportion of non-neutral mutations
     """
     neu_len = round(seq_len * kwargs['neu_prop'])
-    neu_fs[0] = neu_len - sum(neu_fs[1:]) 
+    neu_fs[0] = neu_len - sum(neu_fs[1:])
     nonneu_len = round(seq_len * kwargs['nonneu_prop'])
-    nonneu_fs[0] = nonneu_len - sum(nonneu_fs[1:]) 
+    nonneu_fs[0] = nonneu_len - sum(nonneu_fs[1:])
 
     with open(output[0], 'w') as o:
         o.write(kwargs['header']+"\n")
