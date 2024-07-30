@@ -27,7 +27,7 @@ np.random.seed(config["seed"])
 replicates = config["replicates"]
 
 #workflow path in case it's not the current directory
-workflow_path = config.get("workflow_path", "./")
+workflow_path = config.get("workflow_path", "./workflows")
 
 # Where you would like all output files from analysis to live
 output_dir = os.path.abspath(config["output_dir"])
@@ -85,7 +85,7 @@ rule all:
         expand(output_dir + "/plots/{demog}/{dfes}/{annots}/dfe.inference.benchmark.pdf",
             demog=demo_model_id_list,
             dfes=dfe_list,
-            annots=annotation_list )
+            annots=annotation_list)
 
 
 # ###############################################################################
@@ -404,13 +404,13 @@ rule plot_results:
             annots=annotation_list,
             ids=pids,
         )),
-        dfe_alpha_res = drop_constant_populations(expand(output_dir + "/inference/{demog}/DFE-alpha/{dfes}/{annots}/{seeds}/pop{ids}/pop{ids}.DFE-alpha.bestfit",
-            demog=demo_model_id_list,
-            seeds=seed_list,
-            dfes=dfe_list,
-            annots=annotation_list,
-            ids=pids,
-        )),
+        #dfe_alpha_res = drop_constant_populations(expand(output_dir + "/inference/{demog}/DFE-alpha/{dfes}/{annots}/{seeds}/pop{ids}/pop{ids}.DFE-alpha.bestfit",
+        #    demog=demo_model_id_list,
+        #    seeds=seed_list,
+        #    dfes=dfe_list,
+        #    annots=annotation_list,
+        #    ids=pids,
+        #)),
         grapes_res = drop_constant_populations(expand(output_dir + "/inference/{demog}/grapes/{dfes}/{annots}/{seeds}/pop{ids}/pop{ids}.grapes.bestfit",
             demog=demo_model_id_list,
             seeds=seed_list,
@@ -438,7 +438,7 @@ rule plot_results:
 
         dadi_bestfits = [ b for b in input.dadi_res if wildcards.demog in b]
         polydfe_bestfits = [ b for b in input.polydfe_res if wildcards.demog in b]
-        dfe_alpha_bestfits = [ b for b in input.dfe_alpha_res if wildcards.demog in b]
+        #dfe_alpha_bestfits = [ b for b in input.dfe_alpha_res if wildcards.demog in b]
         grapes_bestfits = [ b for b in input.grapes_res if wildcards.demog in b ]
 
         if wildcards.demog == 'Constant': 
@@ -447,7 +447,7 @@ rule plot_results:
 
             dadi_bestfits = [ b for b in dadi_bestfits if 'pop0' in b ]
             polydfe_bestfits = [ b for b in polydfe_bestfits if 'pop0' in b ]
-            dfe_alpha_bestfits = [ b for b in dfe_alpha_bestfits if 'pop0' in b ]
+            #dfe_alpha_bestfits = [ b for b in dfe_alpha_bestfits if 'pop0' in b ]
             grapes_bestfits = [ b for b in grapes_bestfits if 'pop0' in b ]
         else: 
             model = species.get_demographic_model(wildcards.demog)
@@ -456,4 +456,6 @@ rule plot_results:
                 mutation_rate = species.genome.mean_mutation_rate
 
         pop_names = [ model.populations[i].name for i in range(len(model.populations)) ]
-        plots.plot_all_dfe_results([dadi_bestfits, polydfe_bestfits, dfe_alpha_bestfits, grapes_bestfits], output, mutation_rate, seq_len, 0.7, pop_names)
+        #plots.plot_all_dfe_results([dadi_bestfits, polydfe_bestfits, dfe_alpha_bestfits, grapes_bestfits], output, mutation_rate, seq_len, 0.7, pop_names)
+        plots.plot_all_dfe_results([dadi_bestfits, polydfe_bestfits, grapes_bestfits], output, mutation_rate, seq_len, 0.7, pop_names)
+

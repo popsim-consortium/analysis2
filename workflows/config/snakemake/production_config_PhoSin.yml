@@ -2,7 +2,7 @@
 "seed": 12345
 "replicates": 3
 "output_dir": "PhoSin_results"
-"workflow_path": "workflows/"
+"workflow_path": "./workflows/"
 
 # species-specific settings
 "species": "PhoSin"
