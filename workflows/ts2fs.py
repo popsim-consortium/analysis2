@@ -93,6 +93,8 @@ def _generate_fs_from_ts(ts_dict, pop_idx, mask_file, annot, species, max_haplos
         # apply masks
         if mask_file is not None:
             mask_intervals = masks.get_mask_from_file_dfe(mask_file, chrm)
+            assert mask_intervals.shape[1] == 2
+            mask_length = sum([interval[1] - interval[0] for interval in mask_intervals])
             ts = ts.delete_intervals(mask_intervals)
 
         # grab coding regions
@@ -105,7 +107,7 @@ def _generate_fs_from_ts(ts_dict, pop_idx, mask_file, annot, species, max_haplos
             non_neutral_anc_count += exon_len * nonneu_prop
             neutral_anc_count += exon_len * neutral_prop
         else:
-            seq_len += chrom_length
+            seq_len += chrom_length - mask_length
             non_neutral_anc_count += chrom_length * nonneu_prop
             neutral_anc_count += chrom_length * neutral_prop
 
