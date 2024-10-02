@@ -26,7 +26,6 @@ output_dir = os.path.abspath(config["output_dir"])
 # The analysis species
 species = stdpopsim.get_species(config["species"])
 
-
 # The names of all chromosomes to simulate, separated by commas
 # Use "all" to simulate all chromsomes for the genome
 chrm_list = [chrom.id for chrom in species.genome.chromosomes]
@@ -47,21 +46,18 @@ for x in demo_model_array:
     else:
         model = species.get_demographic_model(x["id"])
     demo_sample_size_dict[x["id"]] = {f"{model.populations[i].name}": m for i, m in enumerate(x["num_samples_per_population"])}
-    demo_pop_ids[x["id"]] = [x.name for x in model.populations]
+    demo_pop_ids[x["id"]] = [x.name for x in model.populations[:len(x["num_samples_per_population"])]]
 
 # Select DFE model from catalog  
 dfe_list = config["dfe_list"]
 annotation_list = config["annotation_list"]
 mask_file = config["mask_file"]
 
-
-
 nchunks=100
 chunks = np.arange(nchunks)
 # ###############################################################################
 # GENERAL RULES & GLOBALS
 # ###############################################################################
-
 
 rule all:
     input:
@@ -92,14 +88,9 @@ rule all:
             chrms=chrm_list,
         ),
 
-
-
- 
-
 rule make_vcf:
     input:
         output_dir + "/simulated_data/{demog}/{dfes}/{annots}/{seeds}/sim_{chrms}.trees"
-
     output:
         output_dir + "/summaries/{demog}/{dfes}/{annots}/{seeds}/sim_{chrms}.vcf"
     run:
@@ -128,10 +119,9 @@ def write_diploshic_ancestralAllelesFile(ts, filename):
 rule make_diploshic_inputs:
     input:
         output_dir + "/simulated_data/{demog}/{dfes}/{annots}/{seeds}/sim_{chrms}.trees"
-
     output:
-        temp(output_dir + "/summaries/{demog}/{dfes}/{annots}/{seeds}/sim_{chrms}.sampleToPopFile"),
-        temp(output_dir + "/summaries/{demog}/{dfes}/{annots}/{seeds}/sim_{chrms}.ancestralAllelesFile")
+        output_dir + "/summaries/{demog}/{dfes}/{annots}/{seeds}/sim_{chrms}.sampleToPopFile",
+        output_dir + "/summaries/{demog}/{dfes}/{annots}/{seeds}/sim_{chrms}.ancestralAllelesFile"
     run:
         ts = tskit.load(input[0])
         write_diploshic_sampleToPopFile(ts, output[0], wildcards.demog)
@@ -156,22 +146,17 @@ rule run_diploshic_fvs:
     input:
         rules.make_vcf.output,
         rules.make_diploshic_inputs.output
-
     output:
-        temp(
             expand(output_dir + "/summaries/{{demog}}/{{dfes}}/{{annots}}/{{seeds}}/sim_{{chrms}}.{{popid}}.{{chunk}}.diploshic.{ext}",
             chunk=chunks,
             ext=["fvec", "stats"],        
             )
-        )
-
     params:
         seq_len = lambda wildcards, input: int(species.get_contig(wildcards.chrms).length), 
         start = lambda wildcards, input: chunk_coords(wildcards.chrms, int(wildcards.chunk), nchunks)[0],
         end = lambda wildcards, input: chunk_coords(wildcards.chrms, int(wildcards.chunk), nchunks)[1],
         test = lambda wildcards, input: chunk_coords(wildcards.chrms, int(wildcards.chunk), nchunks)[2],
         popid = lambda wildcards, input: wildcards.popid,
-
     shell:
         """
         if [[ {params.test} -eq 1 && `diploSHIC fvecVcf haploid {input[0]} 1 {params.seq_len} {output[0]} --sampleToPopFileName {input[1]} --ancFileName {input[2]} --targetPop {params.popid} --statFileName {output[1]} --segmentStart {params.start} --segmentEnd {params.end}` == 0 ]]; 
@@ -181,8 +166,7 @@ rule run_diploshic_fvs:
                 touch {output[0]} && touch {output[1]}
         fi
         """
-
-
+        
 rule gather_diploshic_fvs:
     input:
          expand(output_dir + "/summaries/{{demog}}/{{dfes}}/{{annots}}/{{seeds}}/sim_{{chrms}}.{{popid}}.{chunk}.diploshic.{ext}",
@@ -222,7 +206,7 @@ rule plot_pi_individual:
         sns.lineplot(x="mid", y="pi", data=df, ax=ax, linewidth=2.5, palette="tab10")
         
         # plot annotations as rugplot
-        if wildcards.annots != "none":
+        if wildcards.annots not in ["none", "all_sites"]:
             exons = species.get_annotations(wildcards.annots)
             exon_intervals = exons.get_chromosome_annotations(wildcards.chrms)
             sns.rugplot(pd.DataFrame(data={'exons':exon_intervals[:,0]}), ax=ax, color="g", lw=1, alpha=0.05)
@@ -266,7 +250,7 @@ rule plot_pi_allseeds:
         for i, stat in enumerate(stat_names):
             sns.lineplot(data=stacked, x="mid", y=stat, hue="seed", alpha=0.5, ax=axs[i])
             # plot annotations as rugplot
-            if wildcards.annots != "none":
+            if wildcards.annots not in ["none", "all_sites"]:
                 exons = species.get_annotations(wildcards.annots)
                 exon_intervals = exons.get_chromosome_annotations(wildcards.chrms)
                 sns.rugplot(pd.DataFrame(data={'exons':exon_intervals[:,0]}),

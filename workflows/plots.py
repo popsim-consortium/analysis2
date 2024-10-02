@@ -246,8 +246,8 @@ def plot_all_dfe_results(input, output, mu, seq_len, nonneu_prop, pop_names=None
     """
     dadi_bestfits = _read_bestfits(input[0], len(pop_names))
     polydfe_bestfits = _read_bestfits(input[1], len(pop_names))
-    dfe_alpha_bestfits = _read_bestfits(input[2], len(pop_names))
-    grapes_bestfits = _read_bestfits(input[3], len(pop_names))
+    #dfe_alpha_bestfits = _read_bestfits(input[2], len(pop_names))
+    grapes_bestfits = _read_bestfits(input[2], len(pop_names))
 
     # SLiM assumes genotype fitnesses: 1, 1+sh, 1+s
     # dadi and polyDFE assumes genotype fitnesses: 1, 1+2sh, 1+2s
@@ -273,10 +273,10 @@ def plot_all_dfe_results(input, output, mu, seq_len, nonneu_prop, pop_names=None
 
     # Per https://doi.org/10.1534/genetics.107.080663 under Model
     # DFE alpha assumes genotype fitnesses are 1, 1-s/2, 1-s, so like SLiM
-    dfe_alpha_shapes = [dfe_alpha_bestfits[i]['b']
-                        for i in range(len(dfe_alpha_bestfits))]
-    dfe_alpha_Es = [abs(dfe_alpha_bestfits[i]['Es'])
-                    for i in range(len(dfe_alpha_bestfits))]
+    #dfe_alpha_shapes = [dfe_alpha_bestfits[i]['b']
+    #                    for i in range(len(dfe_alpha_bestfits))]
+    #dfe_alpha_Es = [abs(dfe_alpha_bestfits[i]['Es'])
+    #                for i in range(len(dfe_alpha_bestfits))]
     
     # Per https://github.com/BioPP/grapes/blob/master/README.md,
     #   GRAPES implements the model of DFE alpha, so we expect genotype fitnesses 1, 1-s/2, and 1-s.
@@ -311,12 +311,12 @@ def plot_all_dfe_results(input, output, mu, seq_len, nonneu_prop, pop_names=None
     plt.subplot(4, 2, 4)
     _plot_boxplots(plt, 'polyDFE', polydfe_Es, 0.014, xtick_label, '|E(s)|')
 
-    plt.subplot(4, 2, 5)
-    _plot_boxplots(plt, 'DFE-alpha', dfe_alpha_shapes,
-                   0.19, xtick_label, 'Shape')
-    plt.subplot(4, 2, 6)
-    _plot_boxplots(plt, 'DFE-alpha', dfe_alpha_Es,
-                   0.014, xtick_label, '|E(s)|')
+    #plt.subplot(4, 2, 5)
+    #_plot_boxplots(plt, 'DFE-alpha', dfe_alpha_shapes,
+    #              0.19, xtick_label, 'Shape')
+    #plt.subplot(4, 2, 6)
+    #_plot_boxplots(plt, 'DFE-alpha', dfe_alpha_Es,
+    #               0.014, xtick_label, '|E(s)|')
 
     plt.subplot(4, 2, 7)
     _plot_boxplots(plt, 'grapes', grapes_shapes, 0.19,
