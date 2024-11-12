@@ -96,9 +96,12 @@ def write_rec_rates(fname, ratemap, windows):
     last = 0
     fh = open(fname, 'w')
     for start, end in windows:
-        cum_cM = ratemap.get_cumulative_mass(end)
-        print(f'{start}\t{end}\t{cum_cM}\t{cum_cM-last}', file=fh)
-        last = cum_cM
+        wsize = end - start
+        start_center = start + (wsize*0.4)
+        end_center = start + (wsize*0.6)
+        cM_center = ratemap.get_cumulative_mass(end_center) - ratemap.get_cumulative_mass(start_center)
+        cM = ratemap.get_cumulative_mass(end) - ratemap.get_cumulative_mass(start)
+        print(f'{start}\t{end}\t{cM}\t{cM_center}', file=fh)
     fh.close()
 
 def write_annot_density(fname, chrom, annot, windows):
@@ -410,7 +413,11 @@ def dump_results(input, output, params_dict, target_pops, num_subwins=1):
     if len(del_intervals) > 0:
         tss = tss.delete_intervals(del_intervals)
         tss = tss.trim()
-    tss.write_vcf(fh_vcf, position_transform = lambda x: np.fmax(1, np.round(x)))
+    # because we are shifting from 0-based to 1-based, I need to remove any sites that may have happened at the last position
+    sites_at_last = np.where(np.round(tss.sites_position)==config["focal_size"])[0]
+    assert sites_at_last.shape[0] < 4 # realistically we shouldn't get more than two or three hits there
+    tss = tss.delete_sites(sites_at_last)
+    tss.write_vcf(fh_vcf, position_transform = lambda x: 1 + np.round(x))
     fh_vcf.close()
     # write seqlen of shortened ts
     with open(output[2], 'w') as f:
@@ -535,7 +542,7 @@ shic_outs3 = [file_prefix+".stats.tsv.shic" for file_prefix in sw_outs_prefix_po
 
 rule all:
     input:
-        rules.diploshic_all.input,
+        rules.diploshic_all.input, 
         boundary_outs + trees_outs + stats_outs + vcf_outs + [output_dir + f'/simulated_data/sweeps/all_sims.stats.tsv', output_dir+f'/simulated_data/sweeps/rec_map_{chrom}_{config["num_windows"]}.tsv'] + annot_outs +anc_outs + fv_outs + pred_outs + shic_outs1 + shic_outs2 + shic_outs3
     default_target: True
 
@@ -556,7 +563,7 @@ rule boundary_sims:
     input:
     output:
         output_dir + "/simulated_data/sweeps/boundary_sims/sim_{seed}_{region_size}.trees"
-    resources: time=6000, mem_mb=6000
+    resources: time=60, mem_mb=6000
     run:
         model = species.get_demographic_model(demo_model["id"])
         mut_rate = model.mutation_rate 
@@ -585,7 +592,7 @@ rule neutral:
     input:
     output:
         output_dir + f"/simulated_data/sweeps/neutral/{demo_model['id']}/{{seed}}/sim_{chrom}_{{left}}_{{right}}.trees", 
-    resources: time=3000, mem_mb=8000
+    resources: time=30, mem_mb=7000
     run:
         model = species.get_demographic_model(demo_model["id"])
         mutation_rate = model.mutation_rate
@@ -617,7 +624,7 @@ rule bgs:
     input:
     output:
         output_dir + f"/simulated_data/sweeps/bgs/{demo_model['id']}/{{annot}}/{{dfe}}/{{seed}}/sim_{chrom}_{{left}}_{{right}}.trees", 
-    resources: time=3000, mem_mb=3000
+    resources: time=30, mem_mb=8000
     run:
         model = species.get_demographic_model(demo_model["id"])
         mutation_rate = model.mutation_rate
@@ -656,7 +663,7 @@ rule sweep:
     input:
     output:
         output_dir + f"/simulated_data/sweeps/sweep/{demo_model['id']}/{{popu}}/{{annot}}/{{dfe}}/{{coeff}}/{{tmult}}/{{seed}}/sim_{{chrom}}_{{left}}_{{right}}.trees", 
-    resources: time=3000, mem_mb=16000
+    resources: time=30, mem_mb=12000
     run:
         model = species.get_demographic_model(demo_model["id"])
         mutation_rate = model.mutation_rate
@@ -751,7 +758,7 @@ rule get_stats:
         output_dir + "/simulated_data/sweeps/{middle}/sim_{chrom}_{left}_{right}.diploshic.ancFile",
         output_dir + "/simulated_data/sweeps/{middle}/sim_{chrom}_{left}_{right}.diploshic.samples"
 
-    resources: time=3000, mem_mb=2000
+    resources: time=30, mem_mb=4000
     run:
         params_dict, target_pops = _get_params_dict_from_wildcards(wildcards)
         dump_results(input, output, params_dict, target_pops, config["num_subwins"])
@@ -766,11 +773,11 @@ rule diploshic_fvs:
 
     output:
         output_dir + '/simulated_data/sweeps/{middle}/sim_{chrom}_{left}_{right}_{popu}.diploshic.fv'
-    resources: time=30, mem_mb=1200
+    resources: time=40, mem_mb=5000
     run:
         with open(input[0],'r') as f:
             seq_len = f.read().strip()
-        cmd = f"diploSHIC fvecVcf haploid {input[1]} 1 {int(seq_len)} {output[0]} --targetPop {wildcards.popu} --sampleToPopFileName {input[3]} --winSize 2200000 --ancFileName {input[2]}"
+        cmd = f"diploSHIC fvecVcf haploid {input[1]} 1 {int(seq_len)} {output[0]} --targetPop {wildcards.popu} --sampleToPopFileName {input[3]} --winSize 1100000 --ancFileName {input[2]}"
         shell(cmd)    
 
 
@@ -780,9 +787,9 @@ rule diploshic_pred:
         rules.diploshic_train_classifier.output
     output:
         output_dir + '/simulated_data/sweeps/{middle}/sim_{chrom}_{left}_{right}_{popu}.diploshic.preds'
-    resources: time=30, mem_mb=1200
+    resources: time=30, mem_mb=3000
     run:
-        cmd = f"export CUDA_VISIBLE_DEVICES=\"\" && diploSHIC predict trained_model.json trained_model.weights.hdf5 {input[0]} {output[0]}" 
+        cmd = f"export CUDA_VISIBLE_DEVICES=\"\" && diploSHIC predict trained_model.json trained_model.weights.h5 {input[0]} {output[0]}" 
         shell(cmd)   
 
 
@@ -790,7 +797,7 @@ rule add_diploshic_preds_to_stats:
     input: output_dir + "/simulated_data/sweeps/{middle}/sim_{chrom}_{left}_{right}.trees",
             output_dir + "/simulated_data/sweeps/{middle}/sim_{chrom}_{left}_{right}_{popu}.diploshic.preds"
     output: output_dir + "/simulated_data/sweeps/{middle}/sim_{chrom}_{left}_{right}_{popu}.stats.tsv.shic"
-    resources: time=30, mem_mb=600
+    resources: time=30, mem_mb=6000
     run:
         params_dict, target_pops = _get_params_dict_from_wildcards(wildcards)
         target_pops = [wildcards.popu]
@@ -806,7 +813,7 @@ rule add_diploshic_preds_to_stats:
         assert np.all(df.classifiedWinEnd <= ts.metadata['windowing']['window_right'])
         assert np.all(df.classifiedWinStart > ts.metadata['windowing']['window_left']+1)
         windows = df.iloc[:,[1,2]].to_numpy().astype(np.int32)
-        stats = 1 - df.iloc[:,5].to_numpy().astype(np.float32) # prob non neutral
+        stats = (df.iloc[:,8].to_numpy() + df.iloc[:,9].to_numpy()).astype(np.float32) # prob soft+hard
         stats = np.expand_dims(stats, axis = 1) # adding another dim going from (n_wins,) to (n_wins,1)
         fh = open(output[0], 'w')
         _print_stat_line("diploshic", stats, windows, target_pops, meta_str, fh)
@@ -817,7 +824,7 @@ rule merge_stats:
     input: stats_outs
     output:
         output_dir + f'/simulated_data/sweeps/all_sims.tmp.stats.tsv'
-    resources: time=3000, mem_mb=350000, disk_mb=350000
+    resources: time=1500, mem_mb=350000, disk_mb=350000
     run:
         #print(input, flush=True)
         #import pdb; pdb.set_trace()
@@ -827,7 +834,7 @@ rule merge_stats_shic1:
     input: shic_outs1
     output:
         output_dir + f'/simulated_data/sweeps/all_sims1.shic.stats.tsv'
-    resources: time=3000, mem_mb=150000, disk_mb=150000
+    resources: time=3000, mem_mb=350000, disk_mb=350000
     run:
         #print(input, flush=True)
         #import pdb; pdb.set_trace()
@@ -837,7 +844,7 @@ rule merge_stats_shic2:
     input: shic_outs2
     output:
         output_dir + f'/simulated_data/sweeps/all_sims2.shic.stats.tsv'
-    resources: time=3000, mem_mb=150000, disk_mb=150000
+    resources: time=3000, mem_mb=350000, disk_mb=350000
     run:
         #print(input, flush=True)
         #import pdb; pdb.set_trace()
@@ -847,7 +854,7 @@ rule merge_stats_shic3:
     input: shic_outs3
     output:
         output_dir + f'/simulated_data/sweeps/all_sims3.shic.stats.tsv'
-    resources: time=3000, mem_mb=150000, disk_mb=150000
+    resources: time=3000, mem_mb=350000, disk_mb=350000
     run:
         #print(input, flush=True)
         #import pdb; pdb.set_trace()
@@ -857,7 +864,7 @@ rule merge_stats_shic3:
 rule merge_all_stats:
     input: [output_dir + f'/simulated_data/sweeps/all_sims.tmp.stats.tsv', output_dir + f'/simulated_data/sweeps/all_sims3.shic.stats.tsv', output_dir + f'/simulated_data/sweeps/all_sims2.shic.stats.tsv', output_dir + f'/simulated_data/sweeps/all_sims1.shic.stats.tsv']
     output: output_dir + f'/simulated_data/sweeps/all_sims.stats.tsv'
-    resources: time=3000, mem_mb=150000, disk_mb=150000
+    resources: time=3000, mem_mb=350000, disk_mb=350000
     shell:
        "cat {input} > {output}"
 
